@@ -55,6 +55,17 @@ def serve():
 
 @app.errorhandler(404)
 def not_found(e):
+    # 기존 레거시 앱 정적 파일 지원 (예: /파일명)
+    legacy_dir = '/home/conansjh20/static'
+    req_path = request.path.lstrip('/')
+    legacy_file = os.path.join(legacy_dir, req_path)
+    
+    # 보안: 파일 경로가 legacy_dir 내부에 있는지 확인 (경로 조작 방지)
+    if os.path.exists(legacy_file) and os.path.isfile(legacy_file):
+        # 상위 폴더 접근(..) 차단
+        if os.path.abspath(legacy_file).startswith(os.path.abspath(legacy_dir)):
+            return send_from_directory(legacy_dir, req_path)
+            
     return send_from_directory(app.static_folder, 'index.html')
 CORS(app)  # 개발 환경에서 프론트엔드와 백엔드 포트가 다를 때 CORS 문제 방지
 
