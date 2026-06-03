@@ -584,12 +584,23 @@ function App() {
                     {(lyrics.includes("찾을 수 없습니다") || lyrics.includes("오류가 발생")) && (
                       <div className="manual-lyrics-wrapper">
                         {!isManualInputOpen ? (
-                          <button 
-                            className="manual-lyrics-btn" 
-                            onClick={() => setIsManualInputOpen(true)}
-                          >
-                            가사 직접 입력하기
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                            <a 
+                              href={`https://www.google.com/search?q=${encodeURIComponent(`${selectedTrack.artists[0]?.name || ''} ${selectedTrack.name} 歌詞`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="manual-lyrics-btn"
+                              style={{ backgroundColor: '#4285F4', textDecoration: 'none', display: 'inline-block' }}
+                            >
+                              🔍 구글에서 가사 검색하기
+                            </a>
+                            <button 
+                              className="manual-lyrics-btn" 
+                              onClick={() => setIsManualInputOpen(true)}
+                            >
+                              ✍️ 가사 직접 복사해 넣기
+                            </button>
+                          </div>
                         ) : (
                           <div className="manual-lyrics-input-area">
                             <textarea 
