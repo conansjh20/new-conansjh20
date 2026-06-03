@@ -249,7 +249,7 @@ function App() {
 
     try {
       const q = encodeURIComponent(`${artist} ${track.name}`);
-      const res = await fetch(`/api/youtube/search?q=${q}`);
+      const res = await fetch(`/api/youtube/search?q=${q}&track_id=${encodeURIComponent(track.id)}`);
       const data = await res.json();
       if (data.videoIds && data.videoIds.length > 0) {
         setYoutubeVideoIds(data.videoIds);

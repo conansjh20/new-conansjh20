@@ -39,12 +39,20 @@ class TrackLyrics(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     play_count = db.Column(db.Integer, default=0)
     likes = db.Column(db.Integer, default=0)
+    youtube_video_id = db.Column(db.String(100), nullable=True)
 
 with app.app_context():
     db.create_all()
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN likes INTEGER DEFAULT 0"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN youtube_video_id VARCHAR(100)"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -158,30 +166,45 @@ YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 @app.route('/api/youtube/search', methods=['GET'])
 def youtube_search():
     query = request.args.get('q')
+    track_id = request.args.get('track_id')
+    
     if not query:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
+
+    if track_id:
+        track = TrackLyrics.query.get(track_id)
+        if track and track.youtube_video_id:
+            return jsonify({"videoIds": [track.youtube_video_id], "videoId": track.youtube_video_id})
         
-    url1 = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=5"
-    url2 = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query} live&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=5"
-    url3 = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query} cover&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=5"
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=5"
     
     video_ids = []
     seen = set()
     
-    for url in [url1, url2, url3]:
-        try:
-            res = requests.get(url).json()
-            if "items" in res:
-                for item in res["items"]:
-                    vid = item["id"]["videoId"]
-                    if vid not in seen:
-                        video_ids.append(vid)
-                        seen.add(vid)
-        except Exception as e:
-            print("Youtube search error:", e)
+    try:
+        res = requests.get(url).json()
+        if "items" in res:
+            for item in res["items"]:
+                vid = item["id"]["videoId"]
+                if vid not in seen:
+                    video_ids.append(vid)
+                    seen.add(vid)
+    except Exception as e:
+        print("Youtube search error:", e)
             
     if len(video_ids) > 0:
-        return jsonify({"videoIds": video_ids, "videoId": video_ids[0]})
+        first_video_id = video_ids[0]
+        
+        if track_id:
+            track = TrackLyrics.query.get(track_id)
+            if not track:
+                track = TrackLyrics(id=track_id, processed_data="[]")
+                db.session.add(track)
+            
+            track.youtube_video_id = first_video_id
+            db.session.commit()
+            
+        return jsonify({"videoIds": video_ids, "videoId": first_video_id})
     else:
         return jsonify({"error": "No video found"}), 404
 
