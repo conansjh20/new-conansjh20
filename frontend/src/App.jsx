@@ -43,6 +43,7 @@ function App() {
   const [likesCount, setLikesCount] = useState(0)
   const [isLiked, setIsLiked] = useState(false)
   const [showHeartAnim, setShowHeartAnim] = useState(false)
+  const [youtubeError, setYoutubeError] = useState(false)
   const searchWrapperRef = useRef(null);
 
   useEffect(() => {
@@ -139,6 +140,7 @@ function App() {
     setYoutubeVideoId(null);
     setYoutubeVideoIds([]);
     setCurrentVideoIndex(0);
+    setYoutubeError(false);
     setIsManualInputOpen(false);
     setManualLyrics('');
     setLyrics("Loading lyrics...");
@@ -199,53 +201,50 @@ function App() {
     try {
       const imgUrl = track.album?.images[0]?.url;
       if (imgUrl) {
-        fetch(`/api/color?url=${encodeURIComponent(imgUrl)}`)
-          .then(res => res.json())
-          .then(colorData => {
-            if (colorData.dominant) {
-              const [r, g, b] = colorData.dominant;
-              const palette = colorData.palette || [];
-              const c2 = palette.length > 1 ? palette[1] : [r, g, b];
-              const c3 = palette.length > 2 ? palette[2] : [r, g, b];
-              const c4 = palette.length > 3 ? palette[3] : c2;
-              
-              const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-              const isDark = luminance < 0.5;
-              
-              const getRelativeLuminance = (r, g, b) => {
-                const [rs, gs, bs] = [r, g, b].map(c => {
-                  c = c / 255;
-                  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-                });
-                return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
-              };
+        const colorRes = await fetch(`/api/color?url=${encodeURIComponent(imgUrl)}`);
+        const colorData = await colorRes.json();
+        if (colorData.dominant) {
+          const [r, g, b] = colorData.dominant;
+          const palette = colorData.palette || [];
+          const c2 = palette.length > 1 ? palette[1] : [r, g, b];
+          const c3 = palette.length > 2 ? palette[2] : [r, g, b];
+          const c4 = palette.length > 3 ? palette[3] : c2;
+          
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          const isDark = luminance < 0.5;
+          
+          const getRelativeLuminance = (r, g, b) => {
+            const [rs, gs, bs] = [r, g, b].map(c => {
+              c = c / 255;
+              return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+          };
 
-              const L1 = getRelativeLuminance(r, g, b);
-              const L2 = getRelativeLuminance(c4[0], c4[1], c4[2]);
-              
-              const lighter = Math.max(L1, L2);
-              const darker = Math.min(L1, L2);
-              const contrastRatio = (lighter + 0.05) / (darker + 0.05);
-              
-              const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
-              
-              setDynamicTheme({
-                '--bg-primary': `rgb(${r}, ${g}, ${b})`,
-                '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
-                '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
-                '--text-primary': isDark ? '#ffffff' : '#121212',
-                '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
-                '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
-                '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
-                '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
-                '--btn-text-color': finalBtnTextColor
-              });
-            }
-          })
-          .catch(err => console.error("Color fetch failed", err));
+          const L1 = getRelativeLuminance(r, g, b);
+          const L2 = getRelativeLuminance(c4[0], c4[1], c4[2]);
+          
+          const lighter = Math.max(L1, L2);
+          const darker = Math.min(L1, L2);
+          const contrastRatio = (lighter + 0.05) / (darker + 0.05);
+          
+          const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
+          
+          setDynamicTheme({
+            '--bg-primary': `rgb(${r}, ${g}, ${b})`,
+            '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
+            '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
+            '--text-primary': isDark ? '#ffffff' : '#121212',
+            '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
+            '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
+            '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
+            '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
+            '--btn-text-color': finalBtnTextColor
+          });
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Color fetch failed", e);
     }
 
     try {
@@ -258,9 +257,12 @@ function App() {
       } else if (data.videoId) {
         setYoutubeVideoId(data.videoId);
         setYoutubeVideoIds([data.videoId]);
+      } else {
+        setYoutubeError(true);
       }
     } catch (err) {
       console.error("Youtube search failed", err);
+      setYoutubeError(true);
     }
     
     try {
@@ -578,7 +580,20 @@ function App() {
                 <p className="track-year">Released: {selectedTrack.album.release_date?.split('-')[0]}</p>
               </div>
             </div>
-            {youtubeVideoId && (
+            {youtubeError ? (
+              <div className="youtube-error-container" style={{ textAlign: 'center', marginTop: '24px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '12px', fontSize: '0.95rem' }}>유튜브 API 할당량 초과로 영상을 바로 불러올 수 없습니다.</p>
+                <a 
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${selectedTrack.artists[0]?.name || ''} ${selectedTrack.name}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="next-video-btn"
+                  style={{ display: 'inline-block', textDecoration: 'none', background: 'var(--accent-gradient)', color: '#fff', border: 'none' }}
+                >
+                  ▶️ 유튜브에서 직접 검색하기
+                </a>
+              </div>
+            ) : youtubeVideoId && (
               <div className="youtube-wrapper">
                 <div className="youtube-container">
                   <YouTube 
