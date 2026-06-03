@@ -679,6 +679,17 @@
     transition: all 0.3s ease;
   }
 
+  .search-and-results-wrapper {
+    overflow-y: auto;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .main-container:not(.has-selection) .search-and-results-wrapper {
+    flex-grow: 1;
+    padding-bottom: 20px;
+  }
+
   /* 1. Fixed Search Bar */
   .search-form {
     flex-shrink: 0;
@@ -686,6 +697,8 @@
     background-color: var(--bg-primary);
     padding: 4px 10px;
     border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
   }
 
   .search-input-container {
