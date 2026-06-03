@@ -176,23 +176,26 @@ function App() {
       .catch(err => console.error("Likes fetch failed", err));
       
     
-    // Fetch Translation for Title and Album
-    try {
-      const infoRes = await fetch('/api/translate/info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: track.name,
-          album: track.album?.name || ''
-        })
-      });
-      if (infoRes.ok) {
-        const infoData = await infoRes.json();
-        setTrackInfo(infoData);
+    // Fetch Translation for Title and Album concurrently
+    (async () => {
+      try {
+        const infoRes = await fetch('/api/translate/info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: track.name,
+            album: track.album?.name || '',
+            track_id: track.id
+          })
+        });
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          setTrackInfo(infoData);
+        }
+      } catch (e) {
+        console.error("Track info fetch failed", e);
       }
-    } catch (e) {
-      console.error("Track info fetch failed", e);
-    }
+    })();
     
     const artist = track.artists[0]?.name || '';
 
@@ -210,160 +213,168 @@ function App() {
       return updated;
     });
 
-    // Fetch dynamic color from backend
-    try {
-      const imgUrl = track.album?.images[0]?.url;
-      if (imgUrl) {
-        const colorRes = await fetch(`/api/color?url=${encodeURIComponent(imgUrl)}`);
-        const colorData = await colorRes.json();
-        if (colorData.dominant) {
-          const [r, g, b] = colorData.dominant;
-          const palette = colorData.palette || [];
-          const c2 = palette.length > 1 ? palette[1] : [r, g, b];
-          const c3 = palette.length > 2 ? palette[2] : [r, g, b];
-          const c4 = palette.length > 3 ? palette[3] : c2;
-          
-          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          const isDark = luminance < 0.5;
-          
-          const getRelativeLuminance = (r, g, b) => {
-            const [rs, gs, bs] = [r, g, b].map(c => {
-              c = c / 255;
-              return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    // Fetch dynamic color from backend concurrently
+    (async () => {
+      try {
+        const imgUrl = track.album?.images[0]?.url;
+        if (imgUrl) {
+          const colorRes = await fetch(`/api/color?url=${encodeURIComponent(imgUrl)}&track_id=${encodeURIComponent(track.id)}`);
+          const colorData = await colorRes.json();
+          if (colorData.dominant) {
+            const [r, g, b] = colorData.dominant;
+            const palette = colorData.palette || [];
+            const c2 = palette.length > 1 ? palette[1] : [r, g, b];
+            const c3 = palette.length > 2 ? palette[2] : [r, g, b];
+            const c4 = palette.length > 3 ? palette[3] : c2;
+            
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            const isDark = luminance < 0.5;
+            
+            const getRelativeLuminance = (r, g, b) => {
+              const [rs, gs, bs] = [r, g, b].map(c => {
+                c = c / 255;
+                return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+              });
+              return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+            };
+
+            const L1 = getRelativeLuminance(r, g, b);
+            const L2 = getRelativeLuminance(c4[0], c4[1], c4[2]);
+            
+            const lighter = Math.max(L1, L2);
+            const darker = Math.min(L1, L2);
+            const contrastRatio = (lighter + 0.05) / (darker + 0.05);
+            
+            const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
+            
+            setDynamicTheme({
+              '--bg-primary': `rgb(${r}, ${g}, ${b})`,
+              '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
+              '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
+              '--text-primary': isDark ? '#ffffff' : '#121212',
+              '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
+              '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
+              '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
+              '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
+              '--btn-text-color': finalBtnTextColor
             });
-            return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
-          };
-
-          const L1 = getRelativeLuminance(r, g, b);
-          const L2 = getRelativeLuminance(c4[0], c4[1], c4[2]);
-          
-          const lighter = Math.max(L1, L2);
-          const darker = Math.min(L1, L2);
-          const contrastRatio = (lighter + 0.05) / (darker + 0.05);
-          
-          const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
-          
-          setDynamicTheme({
-            '--bg-primary': `rgb(${r}, ${g}, ${b})`,
-            '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
-            '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
-            '--text-primary': isDark ? '#ffffff' : '#121212',
-            '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
-            '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
-            '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
-            '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
-            '--btn-text-color': finalBtnTextColor
-          });
+          }
         }
+      } catch (e) {
+        console.error("Color fetch failed", e);
       }
-    } catch (e) {
-      console.error("Color fetch failed", e);
-    }
+    })();
 
-    try {
-      const q = encodeURIComponent(`${artist} ${track.name}`);
-      const res = await fetch(`/api/youtube/search?q=${q}&track_id=${encodeURIComponent(track.id)}`);
-      const data = await res.json();
-      if (data.videoIds && data.videoIds.length > 0) {
-        setYoutubeVideoIds(data.videoIds);
-        setYoutubeVideoId(data.videoIds[0]);
-      } else if (data.videoId) {
-        setYoutubeVideoId(data.videoId);
-        setYoutubeVideoIds([data.videoId]);
-      } else {
+    // Fetch Youtube concurrently
+    (async () => {
+      try {
+        const q = encodeURIComponent(`${artist} ${track.name}`);
+        const res = await fetch(`/api/youtube/search?q=${q}&track_id=${encodeURIComponent(track.id)}`);
+        const data = await res.json();
+        if (data.videoIds && data.videoIds.length > 0) {
+          setYoutubeVideoIds(data.videoIds);
+          setYoutubeVideoId(data.videoIds[0]);
+        } else if (data.videoId) {
+          setYoutubeVideoId(data.videoId);
+          setYoutubeVideoIds([data.videoId]);
+        } else {
+          setYoutubeError(true);
+        }
+      } catch (err) {
+        console.error("Youtube search failed", err);
         setYoutubeError(true);
       }
-    } catch (err) {
-      console.error("Youtube search failed", err);
-      setYoutubeError(true);
-    }
+    })();
     
-    try {
-      setLyrics("가사를 불러오는 중입니다...");
-      const dbRes = await fetch(`/api/lyrics/${track.id}`);
-      if (dbRes.ok) {
-        const dbData = await dbRes.json();
-        if (dbData && dbData.length > 0) {
-          setLyrics(dbData);
-          return; // Exit early, no need for LRCLIB!
+    // Fetch Lyrics concurrently
+    (async () => {
+      try {
+        setLyrics("가사를 불러오는 중입니다...");
+        const dbRes = await fetch(`/api/lyrics/${track.id}`);
+        if (dbRes.ok) {
+          const dbData = await dbRes.json();
+          if (dbData && dbData.length > 0) {
+            setLyrics(dbData);
+            return; // Exit early, no need for LRCLIB!
+          }
         }
+      } catch (err) {
+        console.error("DB fetch failed", err);
       }
-    } catch (err) {
-      console.error("DB fetch failed", err);
-    }
 
-    try {
-      const targetDuration = Math.round(track.duration_ms / 1000);
-      const searchQuery = encodeURIComponent(`${artist} ${track.name}`);
-      const url = `https://lrclib.net/api/search?q=${searchQuery}`;
-      const res = await fetch(url);
-      
-      if (res.ok) {
-        const data = await res.json();
+      try {
+        const targetDuration = Math.round(track.duration_ms / 1000);
+        const searchQuery = encodeURIComponent(`${artist} ${track.name}`);
+        const url = `https://lrclib.net/api/search?q=${searchQuery}`;
+        const res = await fetch(url);
         
-        if (data && data.length > 0) {
-          const isJapanese = (text) => /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text || '');
+        if (res.ok) {
+          const data = await res.json();
           
-          // Sort by duration match
-          const sortedData = data.sort((a, b) => Math.abs(a.duration - targetDuration) - Math.abs(b.duration - targetDuration));
-          
-          // 1. Closest duration AND Japanese text
-          let selectedItem = sortedData.find(item => Math.abs(item.duration - targetDuration) <= 5 && isJapanese(item.syncedLyrics || item.plainLyrics));
-          
-          // 2. Any duration AND Japanese text
-          if (!selectedItem) {
-              selectedItem = sortedData.find(item => isJapanese(item.syncedLyrics || item.plainLyrics));
-          }
-          
-          // 3. Closest duration with synced lyrics
-          if (!selectedItem) {
-              selectedItem = sortedData.find(item => Math.abs(item.duration - targetDuration) <= 5 && item.syncedLyrics);
-          }
-          
-          // 4. Just the closest one
-          if (!selectedItem) {
-              selectedItem = sortedData[0];
-          }
-
-          const rawLyrics = selectedItem.syncedLyrics || selectedItem.plainLyrics || "";
-          
-          if (rawLyrics) {
-            setLyrics("가사를 처리하고 번역하는 중입니다. (약 3~5초 소요)...");
-            const processRes = await fetch('/api/lyrics/process', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                lyrics: rawLyrics, 
-                track_id: track.id,
-                title: track.name,
-                artist: artist,
-                cover_url: track.album?.images?.[0]?.url || ''
-              })
-            });
+          if (data && data.length > 0) {
+            const isJapanese = (text) => /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text || '');
             
-            if (processRes.ok) {
-              const processed = await processRes.json();
-              setLyrics(processed);
+            // Sort by duration match
+            const sortedData = data.sort((a, b) => Math.abs(a.duration - targetDuration) - Math.abs(b.duration - targetDuration));
+            
+            // 1. Closest duration AND Japanese text
+            let selectedItem = sortedData.find(item => Math.abs(item.duration - targetDuration) <= 5 && isJapanese(item.syncedLyrics || item.plainLyrics));
+            
+            // 2. Any duration AND Japanese text
+            if (!selectedItem) {
+                selectedItem = sortedData.find(item => isJapanese(item.syncedLyrics || item.plainLyrics));
+            }
+            
+            // 3. Closest duration with synced lyrics
+            if (!selectedItem) {
+                selectedItem = sortedData.find(item => Math.abs(item.duration - targetDuration) <= 5 && item.syncedLyrics);
+            }
+            
+            // 4. Just the closest one
+            if (!selectedItem) {
+                selectedItem = sortedData[0];
+            }
+
+            const rawLyrics = selectedItem.syncedLyrics || selectedItem.plainLyrics || "";
+            
+            if (rawLyrics) {
+              setLyrics("가사를 처리하고 번역하는 중입니다. (약 3~5초 소요)...");
+              const processRes = await fetch('/api/lyrics/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  lyrics: rawLyrics, 
+                  track_id: track.id,
+                  title: track.name,
+                  artist: artist,
+                  cover_url: track.album?.images?.[0]?.url || ''
+                })
+              });
+              
+              if (processRes.ok) {
+                const processed = await processRes.json();
+                setLyrics(processed);
+              } else {
+                setLyrics(`가사 처리 중 서버 오류가 발생했습니다. (상태 코드: ${processRes.status})`);
+              }
             } else {
-              setLyrics(`가사 처리 중 서버 오류가 발생했습니다. (상태 코드: ${processRes.status})`);
+              setLyrics("해당 곡의 가사를 찾을 수 없습니다 (LRCLIB 검색 결과에 가사 없음).");
             }
           } else {
-            setLyrics("해당 곡의 가사를 찾을 수 없습니다 (LRCLIB 검색 결과에 가사 없음).");
+            setLyrics("해당 곡의 가사를 찾을 수 없습니다 (검색 결과 없음).");
           }
         } else {
-          setLyrics("해당 곡의 가사를 찾을 수 없습니다 (검색 결과 없음).");
+          if (res.status === 429) {
+            setLyrics("LRCLIB 가사 API 호출 제한(Rate Limit)을 초과했습니다. 잠시 후 다시 시도해주세요. (429 Too Many Requests)");
+          } else {
+            setLyrics(`가사를 찾을 수 없습니다. API 오류 코드: ${res.status}`);
+          }
         }
-      } else {
-        if (res.status === 429) {
-          setLyrics("LRCLIB 가사 API 호출 제한(Rate Limit)을 초과했습니다. 잠시 후 다시 시도해주세요. (429 Too Many Requests)");
-        } else {
-          setLyrics(`가사를 찾을 수 없습니다. API 오류 코드: ${res.status}`);
-        }
+      } catch (err) {
+        console.error("Lyrics fetch failed", err);
+        setLyrics(`가사를 불러오는 중 네트워크 또는 API 오류가 발생했습니다: ${err.message}`);
       }
-    } catch (err) {
-      console.error("Lyrics fetch failed", err);
-      setLyrics(`가사를 불러오는 중 네트워크 또는 API 오류가 발생했습니다: ${err.message}`);
-    }
+    })();
   };
 
   const handleArtistClick = async (artistId) => {

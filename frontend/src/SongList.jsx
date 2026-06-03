@@ -237,24 +237,71 @@ export default function SongList() {
                 </div>
                 
                 {selectedSong?.id === song.id && (
-                  <div className="lyrics-container list-lyrics">
-                    {typeof song.lyrics === 'string' ? (
-                      <div className="lyrics-string-container">
-                        <pre className="lyrics-text">{song.lyrics}</pre>
-                      </div>
-                    ) : (
-                      song.lyrics.map((line, idx) => (
-                        <div key={idx} className="lyrics-line">
-                          <div className="lyrics-original">{line.original}</div>
-                          {line.pronunciation && line.pronunciation !== line.original && (
-                            <div className="lyrics-pronunciation">{renderPhonetic(line.pronunciation)}</div>
-                          )}
-                          {line.translation && (
-                            <div className="lyrics-translation">{line.translation}</div>
-                          )}
+                  <div className="expanded-song-details" style={song.theme_colors ? {
+                      '--bg-primary': `rgb(${song.theme_colors.dominant.join(',')})`
+                  } : {}}>
+                    <div className="song-metadata-grid">
+                       <div className="meta-item">
+                           <span className="meta-label">재생 횟수</span>
+                           <span className="meta-value">{song.play_count || 0}회</span>
+                       </div>
+                       <div className="meta-item">
+                           <span className="meta-label">저장 일시</span>
+                           <span className="meta-value">{song.created_at ? new Date(song.created_at).toLocaleString() : '-'}</span>
+                       </div>
+                       <div className="meta-item">
+                           <span className="meta-label">번역된 제목</span>
+                           <span className="meta-value">{song.translated_title_info?.translation || '-'}</span>
+                       </div>
+                       <div className="meta-item">
+                           <span className="meta-label">번역된 앨범명</span>
+                           <span className="meta-value">{song.translated_album_info?.translation || '-'}</span>
+                       </div>
+                       <div className="meta-item">
+                           <span className="meta-label">유튜브 연결</span>
+                           <span className="meta-value">
+                               {song.youtube_video_id ? (
+                                   <a href={`https://youtu.be/${song.youtube_video_id}`} target="_blank" rel="noopener noreferrer">
+                                       {song.youtube_video_id} 🔗
+                                   </a>
+                               ) : '-'}
+                           </span>
+                       </div>
+                       <div className="meta-item">
+                           <span className="meta-label">테마 색상</span>
+                           <span className="meta-value">
+                               {song.theme_colors ? (
+                                   <span className="color-swatch-container">
+                                       <span className="color-swatch" style={{backgroundColor: `rgb(${song.theme_colors.dominant.join(',')})`}} title="Dominant"></span>
+                                       {song.theme_colors.palette?.map((c, i) => (
+                                           <span key={i} className="color-swatch" style={{backgroundColor: `rgb(${c.join(',')})`}} title={`Palette ${i+1}`}></span>
+                                       ))}
+                                   </span>
+                               ) : '-'}
+                           </span>
+                       </div>
+                    </div>
+                    
+                    <h3 className="lyrics-heading">가사 데이터</h3>
+                    <div className="lyrics-container list-lyrics" style={{ borderTop: 'none', padding: '0' }}>
+                      {typeof song.lyrics === 'string' ? (
+                        <div className="lyrics-string-container">
+                          <pre className="lyrics-text">{song.lyrics}</pre>
                         </div>
-                      ))
-                    )}
+                      ) : (
+                        song.lyrics?.map((line, idx) => (
+                          <div key={idx} className="lyrics-line">
+                            <div className="lyrics-original">{line.original}</div>
+                            {line.pronunciation && line.pronunciation !== line.original && (
+                              <div className="lyrics-pronunciation">{renderPhonetic(line.pronunciation)}</div>
+                            )}
+                            {line.translation && (
+                              <div className="lyrics-translation">{line.translation}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

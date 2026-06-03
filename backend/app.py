@@ -40,6 +40,10 @@ class TrackLyrics(db.Model):
     play_count = db.Column(db.Integer, default=0)
     likes = db.Column(db.Integer, default=0)
     youtube_video_id = db.Column(db.String(100), nullable=True)
+    youtube_video_ids = db.Column(db.Text, nullable=True)
+    translated_title_info = db.Column(db.Text, nullable=True)
+    translated_album_info = db.Column(db.Text, nullable=True)
+    theme_colors = db.Column(db.Text, nullable=True)
 
 with app.app_context():
     db.create_all()
@@ -53,6 +57,22 @@ with app.app_context():
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN youtube_video_id VARCHAR(100)"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN youtube_video_ids TEXT"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN translated_title_info TEXT"))
+        db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN translated_album_info TEXT"))
+        db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN theme_colors TEXT"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -117,14 +137,57 @@ def spotify_search():
     if not query:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
         
-    token = get_spotify_token()
-    url = f"https://api.spotify.com/v1/search?q={query}&type=track&limit=10"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    items = []
+    seen_ids = set()
     
-    result = requests.get(url, headers=headers)
-    return jsonify(json.loads(result.content))
+    # 1. Search in local database first
+    try:
+        db_tracks = TrackLyrics.query.filter(
+            db.or_(
+                TrackLyrics.title.ilike(f'%{query}%'),
+                TrackLyrics.artist.ilike(f'%{query}%')
+            )
+        ).limit(10).all()
+        
+        for t in db_tracks:
+            items.append({
+                "id": t.id,
+                "name": t.title,
+                "artists": [{"name": t.artist, "id": ""}],
+                "album": {
+                    "name": "Local DB",
+                    "images": [{"url": t.cover_url}] if t.cover_url else []
+                },
+                "duration_ms": 0,
+                "is_local_db": True
+            })
+            seen_ids.add(t.id)
+    except Exception as e:
+        print("DB search error:", e)
+        
+    # 2. Fetch from Spotify API if we need more results
+    if len(items) < 15:
+        try:
+            token = get_spotify_token()
+            url = f"https://api.spotify.com/v1/search?q={query}&type=track&limit=15"
+            headers = {
+                "Authorization": f"Bearer {token}"
+            }
+            
+            result = requests.get(url, headers=headers)
+            spotify_data = result.json()
+            
+            if "tracks" in spotify_data and "items" in spotify_data["tracks"]:
+                for st in spotify_data["tracks"]["items"]:
+                    if st["id"] not in seen_ids:
+                        items.append(st)
+                        seen_ids.add(st["id"])
+                        if len(items) >= 15:
+                            break
+        except Exception as e:
+            print("Spotify search error:", e)
+            
+    return jsonify({"tracks": {"items": items}})
 
 @app.route('/api/spotify/artist/<artist_id>/top-tracks', methods=['GET'])
 def spotify_artist_top_tracks(artist_id):
@@ -173,7 +236,14 @@ def youtube_search():
 
     if track_id:
         track = TrackLyrics.query.get(track_id)
-        if track and track.youtube_video_id:
+        if track and track.youtube_video_ids:
+            try:
+                cached_ids = json.loads(track.youtube_video_ids)
+                if cached_ids:
+                    return jsonify({"videoIds": cached_ids, "videoId": cached_ids[0]})
+            except Exception:
+                pass
+        elif track and track.youtube_video_id:
             return jsonify({"videoIds": [track.youtube_video_id], "videoId": track.youtube_video_id})
         
     url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=15"
@@ -202,6 +272,7 @@ def youtube_search():
                 db.session.add(track)
             
             track.youtube_video_id = first_video_id
+            track.youtube_video_ids = json.dumps(video_ids)
             db.session.commit()
             
         return jsonify({"videoIds": video_ids, "videoId": first_video_id})
@@ -224,7 +295,11 @@ def get_songlist():
             "created_at": track.created_at.isoformat() if track.created_at else None,
             "play_count": track.play_count,
             "likes": track.likes or 0,
-            "lyrics": json.loads(track.processed_data)
+            "youtube_video_id": track.youtube_video_id,
+            "translated_title_info": json.loads(track.translated_title_info) if getattr(track, 'translated_title_info', None) else None,
+            "translated_album_info": json.loads(track.translated_album_info) if getattr(track, 'translated_album_info', None) else None,
+            "theme_colors": json.loads(track.theme_colors) if getattr(track, 'theme_colors', None) else None,
+            "lyrics": json.loads(track.processed_data) if track.processed_data else []
         })
         
     return jsonify({
@@ -275,15 +350,40 @@ def delete_song(track_id):
 @app.route('/api/translate/info', methods=['POST'])
 def translate_info():
     data = request.json
+    track_id = data.get('track_id')
+    
+    if track_id:
+        track = TrackLyrics.query.get(track_id)
+        if track and track.translated_title_info:
+            return jsonify({
+                "title": json.loads(track.translated_title_info),
+                "album": json.loads(track.translated_album_info) if track.translated_album_info else None
+            })
+            
     title = data.get('title', '')
     album = data.get('album', '')
     
     title_proc = process_lyrics_text(title)
+    title_info = title_proc[0] if title_proc else None
+    
     album_proc = process_lyrics_text(album)
+    album_info = album_proc[0] if album_proc else None
+    
+    if track_id:
+        track = TrackLyrics.query.get(track_id)
+        if not track:
+            track = TrackLyrics(id=track_id, processed_data="[]")
+            db.session.add(track)
+            
+        if title_info:
+            track.translated_title_info = json.dumps(title_info)
+        if album_info:
+            track.translated_album_info = json.dumps(album_info)
+        db.session.commit()
     
     return jsonify({
-        "title": title_proc[0] if title_proc else None,
-        "album": album_proc[0] if album_proc else None
+        "title": title_info,
+        "album": album_info
     })
 
 @app.route('/api/lyrics/process', methods=['POST'])
@@ -352,19 +452,36 @@ def add_like(track_id):
 @app.route('/api/color', methods=['GET'])
 def get_color():
     img_url = request.args.get('url')
+    track_id = request.args.get('track_id')
     if not img_url:
         return jsonify({"error": "No url provided"}), 400
         
+    if track_id:
+        track = TrackLyrics.query.get(track_id)
+        if track and track.theme_colors:
+            return jsonify(json.loads(track.theme_colors))
+            
     try:
         r = requests.get(img_url, timeout=5)
         f = io.BytesIO(r.content)
         color_thief = ColorThief(f)
-        dominant_color = color_thief.get_color(quality=1)
-        palette = color_thief.get_palette(color_count=4, quality=1)
-        return jsonify({
+        dominant_color = color_thief.get_color(quality=10)
+        palette = color_thief.get_palette(color_count=4, quality=10)
+        
+        result = {
             "dominant": dominant_color,
             "palette": palette
-        })
+        }
+        
+        if track_id:
+            track = TrackLyrics.query.get(track_id)
+            if not track:
+                track = TrackLyrics(id=track_id, processed_data="[]")
+                db.session.add(track)
+            track.theme_colors = json.dumps(result)
+            db.session.commit()
+            
+        return jsonify(result)
     except Exception as e:
         print("Color extraction failed:", e)
         return jsonify({"error": str(e)}), 500
