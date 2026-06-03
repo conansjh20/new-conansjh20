@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Node
+node_modules/
+# dist/ (주석처리: PythonAnywhere 배포를 위해 빌드 결과물을 깃헙에 포함)
+dist-ssr/
+.npm
+.eslintcache
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
