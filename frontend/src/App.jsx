@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { translateKoreanToJapanese } from './translator'
 import YouTube from 'react-youtube'
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom'
 
 const renderPhonetic = (text) => {
   if (!text) return null;
@@ -24,6 +24,8 @@ const isEnglishLyric = (text) => {
 };
 
 function App() {
+  const navigate = useNavigate();
+  const { id } = useParams();
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [selectedTrack, setSelectedTrack] = useState(null)
@@ -66,6 +68,28 @@ function App() {
     };
   }, []);
 
+  // Handle URL ID changes
+  useEffect(() => {
+    if (id && (!selectedTrack || selectedTrack.id !== id)) {
+      setIsSearching(true);
+      fetch(`/api/spotify/track/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.id) {
+            handleSelectTrack(data, true);
+          }
+        })
+        .catch(err => console.error("Failed to load track from URL", err))
+        .finally(() => setIsSearching(false));
+    } else if (!id && selectedTrack) {
+      setSelectedTrack(null);
+      setYoutubeVideoId(null);
+      setLyrics(null);
+      setDynamicTheme(null);
+      document.title = "코난수집함";
+    }
+  }, [id]);
+
   const [recentSearches, setRecentSearches] = useState(() => {
     try {
       const saved = localStorage.getItem('recentSearches');
@@ -105,7 +129,11 @@ function App() {
     }
   };
 
-  const handleSelectTrack = async (track) => {
+  const handleSelectTrack = async (track, preventNavigate = false) => {
+    if (!preventNavigate) {
+      navigate(`/song/${track.id}`);
+    }
+    document.title = `${track.name} - ${track.artists[0]?.name || '아티스트'}`;
     setSelectedTrack(track);
     setResults([]);
     setYoutubeVideoId(null);
@@ -416,7 +444,7 @@ function App() {
       style={dynamicTheme || {}}
     >
       <div className="search-wrapper">
-        <h1 className="logo-text" onClick={() => window.location.href = '/'} style={{ cursor: 'pointer' }}>코난수집함</h1>
+        <h1 className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>코난수집함</h1>
         
         <div className="search-and-results-wrapper" ref={searchWrapperRef}>
           <form onSubmit={handleSearch} className="search-form">

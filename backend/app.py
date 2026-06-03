@@ -336,6 +336,20 @@ def get_color():
         print("Color extraction failed:", e)
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/spotify/track/<track_id>', methods=['GET'])
+def spotify_get_track(track_id):
+    try:
+        token = get_spotify_token()
+        url = f"https://api.spotify.com/v1/tracks/{track_id}?market=KR"
+        headers = {"Authorization": f"Bearer {token}"}
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            return jsonify(res.json())
+        else:
+            return jsonify({"error": "Failed to fetch track"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 ##########################################################
 # 라디오 라우트
