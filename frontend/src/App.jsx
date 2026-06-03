@@ -270,8 +270,10 @@ function App() {
       const dbRes = await fetch(`/api/lyrics/${track.id}`);
       if (dbRes.ok) {
         const dbData = await dbRes.json();
-        setLyrics(dbData);
-        return; // Exit early, no need for LRCLIB!
+        if (dbData && dbData.length > 0) {
+          setLyrics(dbData);
+          return; // Exit early, no need for LRCLIB!
+        }
       }
     } catch (err) {
       console.error("DB fetch failed", err);
