@@ -157,8 +157,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 0 4px;
+  width: 100%;
+  overflow: hidden;
 }
 
 .recent-searches-label {
@@ -170,7 +172,9 @@
 .recent-searches-list {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 .recent-search-btn {
@@ -179,9 +183,13 @@
   color: var(--btn-text-color);
   padding: 4px 12px;
   border-radius: 16px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
 }
 
 .recent-search-btn:hover {
@@ -648,21 +656,20 @@
 /* Mobile UI Optimization */
 /* ========================================================= */
 @media (max-width: 600px) {
-  /* 100vh Fixed Layout */
   .main-container {
-    height: 100vh;
-    padding-top: 10px; /* Fixed padding for alignment */
-    overflow: hidden;
+    min-height: 100vh;
+    height: auto;
+    padding-top: 10px;
+    overflow: visible;
   }
   
   .search-wrapper {
-    height: 100%;
+    height: auto;
     display: flex;
     flex-direction: column;
     padding: 0;
   }
 
-  /* Make logo small when track is selected instead of hiding */
   .has-selection .logo-text {
     font-size: 1.1rem;
     line-height: 24px;
@@ -670,7 +677,6 @@
     margin-top: 0;
   }
 
-  /* Reduce logo size slightly when not hidden */
   .logo-text {
     font-size: 3.5rem;
     line-height: 1;
@@ -680,55 +686,54 @@
   }
 
   .search-and-results-wrapper {
-    overflow-y: auto;
-    min-height: 0;
     width: 100%;
   }
 
   .main-container:not(.has-selection) .search-and-results-wrapper {
-    flex-grow: 1;
     padding-bottom: 20px;
   }
 
-  /* 1. Fixed Search Bar */
+  /* Remove sticky so we can scroll past it to put video at the top */
   .search-form {
     flex-shrink: 0;
     z-index: 100;
     background-color: var(--bg-primary);
     padding: 4px 10px;
     border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
   }
 
   .search-input-container {
     height: 36px;
   }
 
-  /* Selected Track Card fills remaining space */
   .selected-track-card {
-    flex-grow: 1;
     display: flex;
     flex-direction: column;
     margin: 0;
     border-radius: 0;
     border: none;
     padding: 0;
-    overflow: hidden;
   }
 
+  /* Reorder inside selected-track-card: Video first, then Info, then Lyrics */
+  .youtube-wrapper {
+    order: -1;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg-primary);
+    padding-bottom: 10px;
+  }
 
-
-  /* Fixed Track Info */
   .selected-track-info {
-    flex-shrink: 0;
-    padding: 4px 10px;
+    order: 0;
+    padding: 10px 10px;
     flex-direction: column;
     text-align: center;
     border-bottom: 1px solid var(--border-color);
   }
 
-  /* Hide album cover to save space */
   .album-cover {
     display: none;
   }
@@ -737,18 +742,15 @@
     font-size: 1rem;
     margin-bottom: 0px;
   }
+  .track-title-wrapper {
+    justify-content: center;
+  }
   .track-artist {
     font-size: 0.85rem;
     margin: 0;
   }
   .track-album, .track-year {
-    display: none; /* Hide extra details */
-  }
-
-  /* Fixed Video Edge-to-edge */
-  .youtube-wrapper {
-    flex-shrink: 0;
-    width: 100%;
+    display: none;
   }
 
   .youtube-container {
@@ -758,21 +760,20 @@
 
   .next-video-btn {
     margin-top: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
     padding: 4px 12px;
     font-size: 0.8rem;
   }
 
-  /* Scrollable Lyrics (Remaining space) */
   .lyrics-container {
-    flex-grow: 1;
-    max-height: none !important;
-    overflow-y: auto !important;
+    order: 1;
     padding: 24px 20px;
     margin: 0;
     border: none;
     background: var(--bg-primary);
     box-shadow: none;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 

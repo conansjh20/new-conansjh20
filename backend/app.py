@@ -176,7 +176,7 @@ def youtube_search():
         if track and track.youtube_video_id:
             return jsonify({"videoIds": [track.youtube_video_id], "videoId": track.youtube_video_id})
         
-    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=5"
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=15"
     
     video_ids = []
     seen = set()
@@ -515,4 +515,4 @@ def new_update_rankO():
     return update_new_rank("data/engcross/newOfficerRank.json")
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)

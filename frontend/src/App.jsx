@@ -91,6 +91,19 @@ function App() {
     }
   }, [id]);
 
+  // Auto-scroll to video on mobile when track is selected
+  useEffect(() => {
+    if (selectedTrack && window.innerWidth <= 600) {
+      setTimeout(() => {
+        const card = document.querySelector('.selected-track-card');
+        if (card) {
+          const y = card.getBoundingClientRect().top + window.scrollY - 10;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 300);
+    }
+  }, [selectedTrack]);
+
   const [recentSearches, setRecentSearches] = useState(() => {
     try {
       const saved = localStorage.getItem('recentSearches');
@@ -332,20 +345,24 @@ function App() {
               const processed = await processRes.json();
               setLyrics(processed);
             } else {
-              setLyrics("가사 처리 중 오류가 발생했습니다.");
+              setLyrics(`가사 처리 중 서버 오류가 발생했습니다. (상태 코드: ${processRes.status})`);
             }
           } else {
-            setLyrics("가사를 찾을 수 없습니다 (Not found).");
+            setLyrics("해당 곡의 가사를 찾을 수 없습니다 (LRCLIB 검색 결과에 가사 없음).");
           }
         } else {
-          setLyrics("가사를 찾을 수 없습니다 (Not found).");
+          setLyrics("해당 곡의 가사를 찾을 수 없습니다 (검색 결과 없음).");
         }
       } else {
-        setLyrics("가사를 찾을 수 없습니다 (Not found).");
+        if (res.status === 429) {
+          setLyrics("LRCLIB 가사 API 호출 제한(Rate Limit)을 초과했습니다. 잠시 후 다시 시도해주세요. (429 Too Many Requests)");
+        } else {
+          setLyrics(`가사를 찾을 수 없습니다. API 오류 코드: ${res.status}`);
+        }
       }
     } catch (err) {
       console.error("Lyrics fetch failed", err);
-      setLyrics("가사를 불러오는 중 오류가 발생했습니다.");
+      setLyrics(`가사를 불러오는 중 네트워크 또는 API 오류가 발생했습니다: ${err.message}`);
     }
   };
 
@@ -476,13 +493,14 @@ function App() {
           {recentSearches.length > 0 && (
             <div className="recent-searches">
               <div className="recent-searches-list">
-                {recentSearches.map(item => (
+                {recentSearches.slice(0, 3).map(item => (
                   <button 
                     key={item.id} 
                     className="recent-search-btn"
                     onClick={() => handleSelectTrack(item.track)}
+                    title={`${item.artist} - ${item.title}`}
                   >
-                    {item.artist} - {item.title}
+                    {item.title}
                   </button>
                 ))}
               </div>
