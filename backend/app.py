@@ -49,9 +49,15 @@ with app.app_context():
     except Exception:
         db.session.rollback()
 
+from flask import make_response
+
 @app.route('/')
 def serve():
-    return send_from_directory(app.static_folder, 'index.html')
+    response = make_response(send_from_directory(app.static_folder, 'index.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.errorhandler(404)
 def not_found(e):
@@ -66,7 +72,11 @@ def not_found(e):
         if os.path.abspath(legacy_file).startswith(os.path.abspath(legacy_dir)):
             return send_from_directory(legacy_dir, req_path)
             
-    return send_from_directory(app.static_folder, 'index.html')
+    response = make_response(send_from_directory(app.static_folder, 'index.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 CORS(app)  # 개발 환경에서 프론트엔드와 백엔드 포트가 다를 때 CORS 문제 방지
 
 @app.route('/api/hello', methods=['GET'])
