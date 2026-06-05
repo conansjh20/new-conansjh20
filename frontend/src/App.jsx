@@ -45,6 +45,7 @@ function App() {
   const [showHeartAnim, setShowHeartAnim] = useState(false)
   const [youtubeError, setYoutubeError] = useState(false)
   const searchWrapperRef = useRef(null);
+  const currentTrackIdRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -148,7 +149,9 @@ function App() {
       navigate(`/song/${track.id}`);
     }
     document.title = `${track.name} - ${track.artists[0]?.name || '아티스트'}`;
+    currentTrackIdRef.current = track.id;
     setSelectedTrack(track);
+    setDynamicTheme(null);
     setResults([]);
     setYoutubeVideoId(null);
     setYoutubeVideoIds([]);
@@ -190,7 +193,9 @@ function App() {
         });
         if (infoRes.ok) {
           const infoData = await infoRes.json();
-          setTrackInfo(infoData);
+          if (currentTrackIdRef.current === track.id) {
+            setTrackInfo(infoData);
+          }
         }
       } catch (e) {
         console.error("Track info fetch failed", e);
@@ -216,7 +221,7 @@ function App() {
     // Fetch dynamic color from backend concurrently
     (async () => {
       try {
-        const imgUrl = track.album?.images[0]?.url;
+        const imgUrl = track.album?.images?.[0]?.url;
         if (imgUrl) {
           const colorRes = await fetch(`/api/color?url=${encodeURIComponent(imgUrl)}&track_id=${encodeURIComponent(track.id)}`);
           const colorData = await colorRes.json();
@@ -247,17 +252,19 @@ function App() {
             
             const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
             
-            setDynamicTheme({
-              '--bg-primary': `rgb(${r}, ${g}, ${b})`,
-              '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
-              '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
-              '--text-primary': isDark ? '#ffffff' : '#121212',
-              '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
-              '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
-              '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
-              '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
-              '--btn-text-color': finalBtnTextColor
-            });
+            if (currentTrackIdRef.current === track.id) {
+              setDynamicTheme({
+                '--bg-primary': `rgb(${r}, ${g}, ${b})`,
+                '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
+                '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
+                '--text-primary': isDark ? '#ffffff' : '#121212',
+                '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
+                '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
+                '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
+                '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
+                '--btn-text-color': finalBtnTextColor
+              });
+            }
           }
         }
       } catch (e) {
@@ -271,14 +278,16 @@ function App() {
         const q = encodeURIComponent(`${artist} ${track.name}`);
         const res = await fetch(`/api/youtube/search?q=${q}&track_id=${encodeURIComponent(track.id)}`);
         const data = await res.json();
-        if (data.videoIds && data.videoIds.length > 0) {
-          setYoutubeVideoIds(data.videoIds);
-          setYoutubeVideoId(data.videoIds[0]);
-        } else if (data.videoId) {
-          setYoutubeVideoId(data.videoId);
-          setYoutubeVideoIds([data.videoId]);
-        } else {
-          setYoutubeError(true);
+        if (currentTrackIdRef.current === track.id) {
+          if (data.videoIds && data.videoIds.length > 0) {
+            setYoutubeVideoIds(data.videoIds);
+            setYoutubeVideoId(data.videoIds[0]);
+          } else if (data.videoId) {
+            setYoutubeVideoId(data.videoId);
+            setYoutubeVideoIds([data.videoId]);
+          } else {
+            setYoutubeError(true);
+          }
         }
       } catch (err) {
         console.error("Youtube search failed", err);
@@ -353,26 +362,26 @@ function App() {
               
               if (processRes.ok) {
                 const processed = await processRes.json();
-                setLyrics(processed);
+                if (currentTrackIdRef.current === track.id) setLyrics(processed);
               } else {
-                setLyrics(`가사 처리 중 서버 오류가 발생했습니다. (상태 코드: ${processRes.status})`);
+                if (currentTrackIdRef.current === track.id) setLyrics(`가사 처리 중 서버 오류가 발생했습니다. (상태 코드: ${processRes.status})`);
               }
             } else {
-              setLyrics("해당 곡의 가사를 찾을 수 없습니다 (LRCLIB 검색 결과에 가사 없음).");
+              if (currentTrackIdRef.current === track.id) setLyrics("해당 곡의 가사를 찾을 수 없습니다 (LRCLIB 검색 결과에 가사 없음).");
             }
           } else {
-            setLyrics("해당 곡의 가사를 찾을 수 없습니다 (검색 결과 없음).");
+            if (currentTrackIdRef.current === track.id) setLyrics("해당 곡의 가사를 찾을 수 없습니다 (검색 결과 없음).");
           }
         } else {
           if (res.status === 429) {
-            setLyrics("LRCLIB 가사 API 호출 제한(Rate Limit)을 초과했습니다. 잠시 후 다시 시도해주세요. (429 Too Many Requests)");
+            if (currentTrackIdRef.current === track.id) setLyrics("LRCLIB 가사 API 호출 제한(Rate Limit)을 초과했습니다. 잠시 후 다시 시도해주세요. (429 Too Many Requests)");
           } else {
-            setLyrics(`가사를 찾을 수 없습니다. API 오류 코드: ${res.status}`);
+            if (currentTrackIdRef.current === track.id) setLyrics(`가사를 찾을 수 없습니다. API 오류 코드: ${res.status}`);
           }
         }
       } catch (err) {
         console.error("Lyrics fetch failed", err);
-        setLyrics(`가사를 불러오는 중 네트워크 또는 API 오류가 발생했습니다: ${err.message}`);
+        if (currentTrackIdRef.current === track.id) setLyrics(`가사를 불러오는 중 네트워크 또는 API 오류가 발생했습니다: ${err.message}`);
       }
     })();
   };
@@ -581,7 +590,7 @@ function App() {
                     {showHeartAnim && <div className="floating-heart">❤️</div>}
                   </button>
                 </div>
-                {trackInfo && trackInfo.title && trackInfo.title.translation && trackInfo.title.translation !== selectedTrack.name && !isEnglishLyric(selectedTrack.name) && (
+                {trackInfo && trackInfo.title && trackInfo.title.translation && trackInfo.title.translation !== selectedTrack.name && (
                   <p className="track-meta-title" style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '8px', lineHeight: '1.2' }}>
                     {trackInfo.title.pronunciation && trackInfo.title.pronunciation !== selectedTrack.name ? <span style={{opacity: 0.8, marginRight: '4px'}}>({trackInfo.title.pronunciation})</span> : null}
                     <span style={{fontWeight: '500'}}>{trackInfo.title.translation}</span>
@@ -602,7 +611,7 @@ function App() {
                   ))}
                 </p>
                 <p className="track-album">Album: {selectedTrack.album.name}</p>
-                {trackInfo && trackInfo.album && trackInfo.album.translation && trackInfo.album.translation !== selectedTrack.album.name && !isEnglishLyric(selectedTrack.album.name) && (
+                {trackInfo && trackInfo.album && trackInfo.album.translation && trackInfo.album.translation !== selectedTrack.album.name && (
                   <p className="track-meta-album" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '4px', lineHeight: '1.2' }}>
                     {trackInfo.album.pronunciation && trackInfo.album.pronunciation !== selectedTrack.album.name ? <span style={{opacity: 0.8, marginRight: '4px'}}>({trackInfo.album.pronunciation})</span> : null}
                     {trackInfo.album.translation}

@@ -78,6 +78,26 @@ with app.app_context():
         db.session.rollback()
 
 from flask import make_response
+from sqlalchemy.exc import IntegrityError
+
+def get_or_create_track(track_id, **kwargs):
+    track = TrackLyrics.query.get(track_id)
+    if not track:
+        track = TrackLyrics(id=track_id, processed_data="[]", **kwargs)
+        db.session.add(track)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            track = TrackLyrics.query.get(track_id)
+            if not track:
+                track = TrackLyrics(id=track_id, processed_data="[]", **kwargs)
+                db.session.add(track)
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+    return track
 
 @app.route('/')
 def serve():
@@ -211,14 +231,14 @@ def get_playlist_latest(playlist_id):
     total = data.get('tracks', {}).get('total', 0)
     
     if total > 0:
-        offset = max(0, total - 100)
-        tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=100&offset={offset}"
+        offset = max(0, total - 50)
+        tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=50&offset={offset}&market=KR"
         res2 = requests.get(tracks_url, headers=headers)
         data2 = res2.json()
         
         items = data2.get('items', [])
         items.reverse()
-        result_tracks = [item['track'] for item in items if item.get('track')]
+        result_tracks = [item['track'] for item in items if item.get('track')][:50]
         return jsonify({"tracks": result_tracks})
     
     return jsonify({"tracks": []})
@@ -266,14 +286,13 @@ def youtube_search():
         first_video_id = video_ids[0]
         
         if track_id:
-            track = TrackLyrics.query.get(track_id)
-            if not track:
-                track = TrackLyrics(id=track_id, processed_data="[]")
-                db.session.add(track)
-            
+            track = get_or_create_track(track_id)
             track.youtube_video_id = first_video_id
             track.youtube_video_ids = json.dumps(video_ids)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             
         return jsonify({"videoIds": video_ids, "videoId": first_video_id})
     else:
@@ -351,9 +370,29 @@ def delete_song(track_id):
 def translate_info():
     data = request.json
     track_id = data.get('track_id')
+    artist = data.get('artist')
+    cover_url = data.get('cover_url')
+    title_raw = data.get('title', '')
+    album_raw = data.get('album', '')
     
     if track_id:
-        track = TrackLyrics.query.get(track_id)
+        track = get_or_create_track(track_id)
+        updated = False
+        if title_raw and not track.title:
+            track.title = title_raw
+            updated = True
+        if artist and not track.artist:
+            track.artist = artist
+            updated = True
+        if cover_url and not track.cover_url:
+            track.cover_url = cover_url
+            updated = True
+        if updated:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                
         if track and track.translated_title_info:
             return jsonify({
                 "title": json.loads(track.translated_title_info),
@@ -370,16 +409,15 @@ def translate_info():
     album_info = album_proc[0] if album_proc else None
     
     if track_id:
-        track = TrackLyrics.query.get(track_id)
-        if not track:
-            track = TrackLyrics(id=track_id, processed_data="[]")
-            db.session.add(track)
-            
+        track = get_or_create_track(track_id)
         if title_info:
             track.translated_title_info = json.dumps(title_info)
         if album_info:
             track.translated_album_info = json.dumps(album_info)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     
     return jsonify({
         "title": title_info,
@@ -402,22 +440,15 @@ def process_lyrics():
     
     # DB 저장 로직
     if track_id:
-        existing_track = TrackLyrics.query.get(track_id)
-        if existing_track:
-            existing_track.processed_data = json.dumps(processed)
-            if title: existing_track.title = title
-            if artist: existing_track.artist = artist
-            if cover_url: existing_track.cover_url = cover_url
-        else:
-            new_track = TrackLyrics(
-                id=track_id, 
-                processed_data=json.dumps(processed),
-                title=title,
-                artist=artist,
-                cover_url=cover_url
-            )
-            db.session.add(new_track)
-        db.session.commit()
+        existing_track = get_or_create_track(track_id, title=title, artist=artist, cover_url=cover_url)
+        existing_track.processed_data = json.dumps(processed)
+        if title: existing_track.title = title
+        if artist: existing_track.artist = artist
+        if cover_url: existing_track.cover_url = cover_url
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         
     return jsonify(processed)
 
@@ -474,12 +505,12 @@ def get_color():
         }
         
         if track_id:
-            track = TrackLyrics.query.get(track_id)
-            if not track:
-                track = TrackLyrics(id=track_id, processed_data="[]")
-                db.session.add(track)
+            track = get_or_create_track(track_id)
             track.theme_colors = json.dumps(result)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             
         return jsonify(result)
     except Exception as e:
