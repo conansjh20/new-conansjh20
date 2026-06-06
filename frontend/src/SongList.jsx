@@ -254,10 +254,48 @@ export default function SongList() {
                   )}
                 </div>
                 
-                {selectedSong?.id === song.id && (
-                  <div className="expanded-song-details" style={song.theme_colors ? {
-                      '--bg-primary': `rgb(${song.theme_colors.dominant.join(',')})`
-                  } : {}}>
+                {selectedSong?.id === song.id && (() => {
+                  let dynamicStyles = {};
+                  if (song.theme_colors && song.theme_colors.dominant) {
+                    const [r, g, b] = song.theme_colors.dominant;
+                    const palette = song.theme_colors.palette || [];
+                    
+                    const getRelativeLuminance = (r, g, b) => {
+                      const [rs, gs, bs] = [r, g, b].map(c => {
+                        c = c / 255;
+                        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                      });
+                      return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+                    };
+                    
+                    const bgLuminance = getRelativeLuminance(r, g, b);
+                    
+                    let bestTextColor = [r, g, b];
+                    let bestContrast = 0;
+                    for (const c of palette) {
+                      const lum = getRelativeLuminance(c[0], c[1], c[2]);
+                      const contrast = (Math.max(bgLuminance, lum) + 0.05) / (Math.min(bgLuminance, lum) + 0.05);
+                      if (contrast > bestContrast) {
+                        bestContrast = contrast;
+                        bestTextColor = c;
+                      }
+                    }
+
+                    if (bestContrast < 1.5) {
+                        bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
+                    }
+                    
+                    dynamicStyles = {
+                      '--bg-primary': `rgb(${r}, ${g}, ${b})`,
+                      '--bg-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.1)`,
+                      '--text-primary': `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`,
+                      '--text-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.8)`,
+                      '--border-color': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.3)`,
+                      '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)'
+                    };
+                  }
+                  return (
+                    <div className="expanded-song-details" style={dynamicStyles}>
                     <div className="song-metadata-grid">
                        <div className="meta-item">
                            <span className="meta-label">재생 횟수</span>
@@ -321,7 +359,7 @@ export default function SongList() {
                       )}
                     </div>
                   </div>
-                )}
+                )})()}
               </div>
             ))
           )}

@@ -232,9 +232,6 @@ function App() {
             const c3 = palette.length > 2 ? palette[2] : [r, g, b];
             const c4 = palette.length > 3 ? palette[3] : c2;
             
-            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            const isDark = luminance < 0.5;
-            
             const getRelativeLuminance = (r, g, b) => {
               const [rs, gs, bs] = [r, g, b].map(c => {
                 c = c / 255;
@@ -243,26 +240,52 @@ function App() {
               return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
             };
 
-            const L1 = getRelativeLuminance(r, g, b);
-            const L2 = getRelativeLuminance(c4[0], c4[1], c4[2]);
+            const bgLuminance = getRelativeLuminance(r, g, b);
             
-            const lighter = Math.max(L1, L2);
-            const darker = Math.min(L1, L2);
-            const contrastRatio = (lighter + 0.05) / (darker + 0.05);
-            
-            const finalBtnTextColor = contrastRatio < 3.0 ? (isDark ? '#ffffff' : '#121212') : `rgb(${c4[0]}, ${c4[1]}, ${c4[2]})`;
+            let bestTextColor = [r, g, b];
+            let bestContrast = 0;
+            for (const c of palette) {
+              const lum = getRelativeLuminance(c[0], c[1], c[2]);
+              const contrast = (Math.max(bgLuminance, lum) + 0.05) / (Math.min(bgLuminance, lum) + 0.05);
+              if (contrast > bestContrast) {
+                bestContrast = contrast;
+                bestTextColor = c;
+              }
+            }
+
+            // 아예 안 보이는 경우(대비 1.5 미만)만 제외하고 최대한 자켓 색상 사용
+            if (bestContrast < 1.5) {
+                bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
+            }
+
+            const textColorStr = `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`;
+            const textSecondaryStr = `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.8)`;
+            const borderColorStr = `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.3)`;
+            const bgSecondaryStr = `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.1)`;
+            const bgHoverStr = `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.2)`;
+
+            setRecentSearches(prev => {
+              const updated = prev.map(item => {
+                if (item.id === track.id) {
+                  return { ...item, dominantColor: [r, g, b], palette: palette };
+                }
+                return item;
+              });
+              localStorage.setItem('recentSearches', JSON.stringify(updated));
+              return updated;
+            });
             
             if (currentTrackIdRef.current === track.id) {
               setDynamicTheme({
                 '--bg-primary': `rgb(${r}, ${g}, ${b})`,
-                '--bg-secondary': isDark ? `rgba(255, 255, 255, 0.15)` : `rgba(0, 0, 0, 0.08)`,
-                '--bg-hover': isDark ? `rgba(255, 255, 255, 0.25)` : `rgba(0, 0, 0, 0.15)`,
-                '--text-primary': isDark ? '#ffffff' : '#121212',
-                '--text-secondary': isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)',
-                '--border-color': isDark ? `rgba(255, 255, 255, 0.2)` : `rgba(0, 0, 0, 0.2)`,
+                '--bg-secondary': bgSecondaryStr,
+                '--bg-hover': bgHoverStr,
+                '--text-primary': textColorStr,
+                '--text-secondary': textSecondaryStr,
+                '--border-color': borderColorStr,
                 '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
-                '--shadow-color': isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
-                '--btn-text-color': finalBtnTextColor
+                '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
+                '--btn-text-color': textColorStr
               });
             }
           }
@@ -514,16 +537,54 @@ function App() {
           {recentSearches.length > 0 && (
             <div className="recent-searches">
               <div className="recent-searches-list">
-                {recentSearches.slice(0, 3).map(item => (
-                  <button 
-                    key={item.id} 
-                    className="recent-search-btn"
-                    onClick={() => handleSelectTrack(item.track)}
-                    title={`${item.artist} - ${item.title}`}
-                  >
-                    {item.title}
-                  </button>
-                ))}
+                {recentSearches.slice(0, 5).map(item => {
+                  let btnStyle = {};
+                  if (item.dominantColor) {
+                    const [r, g, b] = item.dominantColor;
+                    const getRelativeLuminance = (r, g, b) => {
+                      const [rs, gs, bs] = [r, g, b].map(c => {
+                        c = c / 255;
+                        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                      });
+                      return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+                    };
+                    const bgLuminance = getRelativeLuminance(r, g, b);
+                    
+                    let bestTextColor = [r, g, b];
+                    let bestContrast = 0;
+                    if (item.palette) {
+                      for (const c of item.palette) {
+                        const lum = getRelativeLuminance(c[0], c[1], c[2]);
+                        const contrast = (Math.max(bgLuminance, lum) + 0.05) / (Math.min(bgLuminance, lum) + 0.05);
+                        if (contrast > bestContrast) {
+                          bestContrast = contrast;
+                          bestTextColor = c;
+                        }
+                      }
+                    }
+                    if (bestContrast < 1.5) {
+                        bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
+                    }
+
+                    btnStyle = {
+                      backgroundColor: `rgb(${r}, ${g}, ${b})`,
+                      color: `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`,
+                      borderColor: `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.3)`
+                    };
+                  }
+                  
+                  return (
+                    <button 
+                      key={item.id} 
+                      className="recent-search-btn"
+                      onClick={() => handleSelectTrack(item.track)}
+                      title={`${item.artist} - ${item.title}`}
+                      style={btnStyle}
+                    >
+                      {item.title}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
