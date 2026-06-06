@@ -126,10 +126,10 @@ export default function JapaneseQuiz() {
             <h2>퀴즈 모드를 선택하세요</h2>
             <p>1700여 개의 단어! 각 문제당 단 <strong>5초</strong>의 시간이 주어집니다.</p>
             <div className="quiz-mode-buttons">
-              <button className="quiz-btn primary" onClick={() => startGame('jp-to-kr')}>
+              <button className="jq-btn primary" onClick={() => startGame('jp-to-kr')}>
                 🇯🇵 일본어 보고 🇰🇷 뜻 맞추기
               </button>
-              <button className="quiz-btn primary" onClick={() => startGame('kr-to-jp')}>
+              <button className="jq-btn primary" onClick={() => startGame('kr-to-jp')}>
                 🇰🇷 뜻 보고 🇯🇵 일본어 맞추기
               </button>
             </div>
@@ -191,7 +191,7 @@ export default function JapaneseQuiz() {
               </div>
             )}
 
-            <button className="quiz-btn restart-btn" onClick={() => setMode('start')}>
+            <button className="jq-btn restart-btn" onClick={() => setMode('start')}>
               다시 시작하기
             </button>
           </div>
