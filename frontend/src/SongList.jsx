@@ -116,6 +116,24 @@ export default function SongList() {
         <h1>저장된 가사 목록</h1>
       </header>
       
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button 
+            disabled={page === 1} 
+            onClick={() => setPage(p => p - 1)}
+          >
+            이전
+          </button>
+          <span>{page} / {totalPages}</span>
+          <button 
+            disabled={page === totalPages} 
+            onClick={() => setPage(p => p + 1)}
+          >
+            다음
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="loading">불러오는 중...</div>
       ) : (

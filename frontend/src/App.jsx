@@ -485,6 +485,7 @@ function App() {
       style={dynamicTheme || {}}
     >
       <div className="search-wrapper">
+        <Link to="/japanese-quiz" style={{ position: 'absolute', top: '20px', right: '20px', textDecoration: 'none', background: 'var(--accent-gradient, linear-gradient(135deg, #6e8efb, #a777e3))', color: '#fff', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '1.2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} title="일본어 퀴즈">🎮</Link>
         <h1 className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>코난수집함</h1>
         
         <div className="search-and-results-wrapper" ref={searchWrapperRef}>
@@ -719,6 +720,10 @@ function App() {
           </div>
         )}
       </div>
+
+      <footer style={{ marginTop: 'auto', padding: '40px 20px 20px', width: '100%', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+        <Link to="/about" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 'bold' }}>코난수집함</Link>, conansjh20@gmail.com
+      </footer>
     </main>
   )
 }
