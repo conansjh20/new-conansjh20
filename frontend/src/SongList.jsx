@@ -22,6 +22,7 @@ export default function SongList() {
   const [selectedSong, setSelectedSong] = useState(null);
   const [editingSongId, setEditingSongId] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', artist: '' });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     fetchSongs(page);
@@ -69,23 +70,53 @@ export default function SongList() {
   const handleSaveEdit = async (e, id) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/songlist/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      });
-      if (res.ok) {
-        setSongs(songs.map(s => s.id === id ? { ...s, ...editForm } : s));
-        setEditingSongId(null);
-        if (selectedSong?.id === id) {
-          setSelectedSong({ ...selectedSong, ...editForm });
+      if (typeof editForm.lyrics === 'string') {
+        setIsProcessing(true);
+        const song = songs.find(s => s.id === id);
+        const processRes = await fetch('/api/lyrics/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lyrics: editForm.lyrics,
+            track_id: id,
+            title: editForm.title,
+            artist: editForm.artist,
+            cover_url: song.cover_url
+          })
+        });
+        
+        if (processRes.ok) {
+          const processedLyrics = await processRes.json();
+          const updatedSong = { ...song, ...editForm, lyrics: processedLyrics };
+          setSongs(songs.map(s => s.id === id ? updatedSong : s));
+          setEditingSongId(null);
+          if (selectedSong?.id === id) {
+            setSelectedSong(updatedSong);
+          }
+        } else {
+          alert('가사 전체 처리에 실패했습니다.');
         }
+        setIsProcessing(false);
       } else {
-        alert('수정에 실패했습니다.');
+        const res = await fetch(`/api/songlist/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editForm),
+        });
+        if (res.ok) {
+          setSongs(songs.map(s => s.id === id ? { ...s, ...editForm } : s));
+          setEditingSongId(null);
+          if (selectedSong?.id === id) {
+            setSelectedSong({ ...selectedSong, ...editForm });
+          }
+        } else {
+          alert('수정에 실패했습니다.');
+        }
       }
     } catch (err) {
       console.error(err);
       alert('오류가 발생했습니다.');
+      setIsProcessing(false);
     }
   };
 
@@ -173,14 +204,28 @@ export default function SongList() {
                         <div className="edit-lyrics-section">
                           <div className="edit-lyrics-title">가사 편집</div>
                           {typeof editForm.lyrics === 'string' ? (
-                            <textarea 
-                              value={editForm.lyrics}
-                              onChange={e => setEditForm({...editForm, lyrics: e.target.value})}
-                              className="edit-textarea"
-                              rows={5}
-                            />
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                              <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
+                                원문 가사를 아래에 통째로 붙여넣고 저장하세요. 
+                                서버에서 새로 번역 및 발음을 추출합니다.
+                              </div>
+                              <textarea 
+                                value={editForm.lyrics}
+                                onChange={e => setEditForm({...editForm, lyrics: e.target.value})}
+                                className="edit-textarea"
+                                rows={10}
+                                placeholder="여기에 일본어 가사를 복사해서 붙여넣으세요..."
+                              />
+                            </div>
                           ) : (
                             <div className="edit-lyrics-list">
+                              <button 
+                                className="replace-all-btn" 
+                                onClick={(e) => { e.stopPropagation(); setEditForm({...editForm, lyrics: ''}); }}
+                                style={{marginBottom: '10px', background: 'var(--accent-color, #ff4757)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold'}}
+                              >
+                                🔄 노래 가사 전체 새로 대체하기
+                              </button>
                               {editForm.lyrics?.map((line, idx) => (
                                 <div key={idx} className="edit-lyric-line">
                                   <input 
@@ -404,6 +449,22 @@ export default function SongList() {
           >
             다음
           </button>
+        </div>
+      )}
+
+      {isProcessing && (
+        <div className="processing-overlay" style={{position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '1.2rem', flexDirection: 'column'}}>
+          <div className="spinner" style={{marginBottom: '20px', width: '50px', height: '50px', border: '5px solid rgba(255,255,255,0.3)', borderTop: '5px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
+          <div style={{fontWeight: 'bold', marginBottom: '10px'}}>가사 원문을 분석하여 재처리 중입니다...</div>
+          <div style={{fontSize: '0.9rem', color: '#ccc'}}>(약 10~20초 소요될 수 있습니다)</div>
+          <style>
+            {`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}
+          </style>
         </div>
       )}
     </div>
