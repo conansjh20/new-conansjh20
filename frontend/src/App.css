@@ -61,11 +61,7 @@
   font-size: 4.5rem;
   font-weight: 800;
   margin-bottom: 30px;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
+  color: var(--accent-color, var(--text-primary));
   letter-spacing: -2px;
   padding-right: 8px; /* Fix right cutoff */
   transition: font-size 0.4s ease, margin-bottom 0.4s ease;
@@ -455,11 +451,8 @@
   font-weight: 800;
   margin-bottom: 24px;
   text-align: center;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
+  background: none;
+  color: var(--accent-color, var(--text-primary));
   letter-spacing: 2px;
 }
 
@@ -536,11 +529,8 @@
 
 .lyrics-translation {
   font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--primary-color);
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  color: var(--accent-color, var(--text-primary));
 }
 
 .track-details {
@@ -796,7 +786,7 @@
 }
 
 .j-toggle-btn.active {
-  background: var(--accent-gradient);
+  background: var(--accent-color, var(--text-primary));
   color: #fff;
   border-color: transparent;
   box-shadow: 0 2px 8px var(--shadow-color);

@@ -279,6 +279,7 @@ function App() {
                 '--text-primary': textColorStr,
                 '--text-secondary': textSecondaryStr,
                 '--border-color': borderColorStr,
+                '--accent-color': `rgb(${c2[0]}, ${c2[1]}, ${c2[2]})`,
                 '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
                 '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
                 '--btn-text-color': textColorStr
@@ -504,7 +505,7 @@ function App() {
       style={dynamicTheme || {}}
     >
       <div className="search-wrapper">
-        <Link to="/japanese-quiz" style={{ position: 'absolute', top: '20px', right: '20px', textDecoration: 'none', background: 'var(--accent-gradient, linear-gradient(135deg, #6e8efb, #a777e3))', color: '#fff', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '1.2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} title="일본어 퀴즈">🎮</Link>
+        <Link to="/japanese-quiz" style={{ position: 'absolute', top: '20px', right: '20px', textDecoration: 'none', background: 'var(--accent-color, #a777e3)', color: '#fff', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '1.2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} title="일본어 퀴즈">🎮</Link>
         <h1 className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>코난수집함</h1>
         
         <div className="search-and-results-wrapper" ref={searchWrapperRef}>
@@ -656,7 +657,7 @@ function App() {
                     <span key={a.id}>
                       <span 
                         onClick={() => handleArtistClick(a.id)}
-                        style={{ cursor: 'pointer', textDecoration: 'none', color: 'var(--btn-text-color)' }}
+                        style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--accent-color, var(--text-primary))', fontWeight: 'bold' }}
                         title={`${a.name} 대표곡 검색`}
                       >
                         {a.name}
@@ -683,7 +684,7 @@ function App() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="next-video-btn"
-                  style={{ display: 'inline-block', textDecoration: 'none', background: 'var(--accent-gradient)', color: '#fff', border: 'none' }}
+                  style={{ display: 'inline-block', textDecoration: 'none', background: 'var(--accent-color, var(--text-secondary))', color: '#fff', border: 'none' }}
                 >
                   ▶️ 유튜브에서 직접 검색하기
                 </a>

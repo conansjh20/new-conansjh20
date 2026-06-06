@@ -288,6 +288,7 @@ export default function SongList() {
                       '--text-primary': `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`,
                       '--text-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.8)`,
                       '--border-color': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.3)`,
+                      '--accent-color': palette.length > 1 ? `rgb(${palette[1][0]}, ${palette[1][1]}, ${palette[1][2]})` : `rgb(${r}, ${g}, ${b})`,
                       '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)'
                     };
                   }
