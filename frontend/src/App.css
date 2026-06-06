@@ -62,16 +62,13 @@
   top: 30px;
   right: 20px;
   text-decoration: none;
-  background: var(--accent-color, #a777e3);
-  color: #fff;
+  background: transparent;
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 0.95rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  font-size: 1.5rem;
   transition: transform 0.2s, top 0.4s ease;
   z-index: 100;
 }

@@ -281,6 +281,15 @@ export default function SongList() {
                       }
                     }
 
+                    // 색상이 너무 똑같아서 아예 안 보이는 경우만 강제로 밝기/어둡기 조절하여 자켓 고유의 색감 유지
+                    if (bestContrast < 1.3) {
+                      const adjust = bgLuminance < 0.5 ? 120 : -120;
+                      bestTextColor = [
+                        Math.max(0, Math.min(255, bestTextColor[0] + adjust)),
+                        Math.max(0, Math.min(255, bestTextColor[1] + adjust)),
+                        Math.max(0, Math.min(255, bestTextColor[2] + adjust))
+                      ];
+                    }
 
                     dynamicStyles = {
                       '--bg-primary': `rgb(${r}, ${g}, ${b})`,
