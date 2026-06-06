@@ -253,10 +253,6 @@ function App() {
               }
             }
 
-            // 아예 안 보이는 경우(대비 1.5 미만)만 제외하고 최대한 자켓 색상 사용
-            if (bestContrast < 1.5) {
-                bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
-            }
 
             const textColorStr = `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`;
             const textSecondaryStr = `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.8)`;
@@ -561,9 +557,6 @@ function App() {
                           bestTextColor = c;
                         }
                       }
-                    }
-                    if (bestContrast < 1.5) {
-                        bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
                     }
 
                     btnStyle = {

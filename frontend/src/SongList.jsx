@@ -281,10 +281,7 @@ export default function SongList() {
                       }
                     }
 
-                    if (bestContrast < 1.5) {
-                        bestTextColor = bgLuminance < 0.5 ? [255, 255, 255] : [20, 20, 20];
-                    }
-                    
+
                     dynamicStyles = {
                       '--bg-primary': `rgb(${r}, ${g}, ${b})`,
                       '--bg-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.1)`,
