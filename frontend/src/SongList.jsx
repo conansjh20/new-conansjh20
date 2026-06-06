@@ -291,13 +291,29 @@ export default function SongList() {
                       ];
                     }
 
+
+
+                    const c3 = palette.length > 2 ? palette[2] : [r, g, b];
+                    let accentColor = [c3[0], c3[1], c3[2]];
+                    const accentLum = getRelativeLuminance(accentColor[0], accentColor[1], accentColor[2]);
+                    const accentContrast = (Math.max(bgLuminance, accentLum) + 0.05) / (Math.min(bgLuminance, accentLum) + 0.05);
+                    
+                    if (accentContrast < 1.3) {
+                      const adjust = bgLuminance < 0.5 ? 120 : -120;
+                      accentColor = [
+                        Math.max(0, Math.min(255, accentColor[0] + adjust)),
+                        Math.max(0, Math.min(255, accentColor[1] + adjust)),
+                        Math.max(0, Math.min(255, accentColor[2] + adjust))
+                      ];
+                    }
+
                     dynamicStyles = {
                       '--bg-primary': `rgb(${r}, ${g}, ${b})`,
                       '--bg-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.1)`,
                       '--text-primary': `rgb(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]})`,
                       '--text-secondary': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.8)`,
                       '--border-color': `rgba(${bestTextColor[0]}, ${bestTextColor[1]}, ${bestTextColor[2]}, 0.3)`,
-                      '--accent-color': palette.length > 1 ? `rgb(${palette[1][0]}, ${palette[1][1]}, ${palette[1][2]})` : `rgb(${r}, ${g}, ${b})`,
+                      '--accent-color': `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`,
                       '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)'
                     };
                   }

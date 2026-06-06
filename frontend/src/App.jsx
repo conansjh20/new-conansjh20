@@ -281,6 +281,19 @@ function App() {
             });
             
             if (currentTrackIdRef.current === track.id) {
+              let accentColor = [c3[0], c3[1], c3[2]];
+              const accentLum = getRelativeLuminance(accentColor[0], accentColor[1], accentColor[2]);
+              const accentContrast = (Math.max(bgLuminance, accentLum) + 0.05) / (Math.min(bgLuminance, accentLum) + 0.05);
+              
+              if (accentContrast < 1.3) {
+                const adjust = bgLuminance < 0.5 ? 120 : -120;
+                accentColor = [
+                  Math.max(0, Math.min(255, accentColor[0] + adjust)),
+                  Math.max(0, Math.min(255, accentColor[1] + adjust)),
+                  Math.max(0, Math.min(255, accentColor[2] + adjust))
+                ];
+              }
+
               setDynamicTheme({
                 '--bg-primary': `rgb(${r}, ${g}, ${b})`,
                 '--bg-secondary': bgSecondaryStr,
@@ -288,8 +301,8 @@ function App() {
                 '--text-primary': textColorStr,
                 '--text-secondary': textSecondaryStr,
                 '--border-color': borderColorStr,
-                '--accent-color': `rgb(${c2[0]}, ${c2[1]}, ${c2[2]})`,
-                '--accent-gradient': `linear-gradient(135deg, rgb(${c2[0]}, ${c2[1]}, ${c2[2]}) 0%, rgb(${c3[0]}, ${c3[1]}, ${c3[2]}) 100%)`,
+                '--accent-color': `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`,
+                '--accent-gradient': `linear-gradient(135deg, rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}) 0%, rgb(${c4[0]}, ${c4[1]}, ${c4[2]}) 100%)`,
                 '--shadow-color': bgLuminance < 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)',
                 '--btn-text-color': textColorStr
               });
