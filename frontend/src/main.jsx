@@ -7,6 +7,8 @@ import SongList from './SongList.jsx'
 import JapaneseQuiz from './JapaneseQuiz.jsx'
 import About from './About.jsx'
 
+import Stats from './Stats.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
@@ -16,6 +18,7 @@ createRoot(document.getElementById('root')).render(
         <Route path="/songlist" element={<SongList />} />
         <Route path="/japanese-quiz" element={<JapaneseQuiz />} />
         <Route path="/about" element={<About />} />
+        <Route path="/stats" element={<Stats />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

@@ -55,6 +55,14 @@ function App() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     
+    // 방문 기록 (하루 1번)
+    const today = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+    const lastVisit = localStorage.getItem('conan_last_visit');
+    if (lastVisit !== today) {
+      fetch('/api/visit', { method: 'POST' }).catch(err => console.error(err));
+      localStorage.setItem('conan_last_visit', today);
+    }
+
     // Fetch latest playlist tracks
     fetch('/api/spotify/playlist/0CihGi2a3T0o1Ztpp6zOtF/latest')
       .then(res => res.json())

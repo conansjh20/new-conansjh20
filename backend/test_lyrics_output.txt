@@ -1,0 +1,1 @@
+{'original': 'こういう先生', 'pronunciation': '코우이우센세이', 'translation': '이런 선생님'}

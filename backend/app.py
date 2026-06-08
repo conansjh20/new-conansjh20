@@ -45,6 +45,10 @@ class TrackLyrics(db.Model):
     translated_album_info = db.Column(db.Text, nullable=True)
     theme_colors = db.Column(db.Text, nullable=True)
 
+class DailyVisitor(db.Model):
+    date = db.Column(db.Date, primary_key=True)
+    count = db.Column(db.Integer, default=0)
+
 with app.app_context():
     db.create_all()
     try:
@@ -130,6 +134,59 @@ CORS(app)  # 개발 환경에서 프론트엔드와 백엔드 포트가 다를 �
 @app.route('/api/hello', methods=['GET'])
 def hello():
     return jsonify({"message": "Hello from Flask Backend!"})
+
+@app.route('/api/visit', methods=['POST'])
+def record_visit():
+    try:
+        from datetime import date
+        today = date.today()
+        visitor = DailyVisitor.query.get(today)
+        if not visitor:
+            visitor = DailyVisitor(date=today, count=1)
+            db.session.add(visitor)
+        else:
+            visitor.count += 1
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print("Visit record error:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    try:
+        from datetime import date
+        from sqlalchemy import func
+        
+        # 1. Total visitors
+        total_visitors = db.session.query(func.sum(DailyVisitor.count)).scalar() or 0
+        
+        # 2. Daily visitors (today)
+        today = date.today()
+        today_visitor = DailyVisitor.query.get(today)
+        daily_visitors = today_visitor.count if today_visitor else 0
+        
+        # 3. Top clicked songs (ordered by play_count)
+        top_tracks = TrackLyrics.query.filter(TrackLyrics.play_count != None).order_by(TrackLyrics.play_count.desc()).limit(20).all()
+        
+        songs = []
+        for track in top_tracks:
+            songs.append({
+                "id": track.id,
+                "title": track.title,
+                "artist": track.artist,
+                "cover_url": track.cover_url,
+                "play_count": track.play_count or 0
+            })
+            
+        return jsonify({
+            "total_visitors": total_visitors,
+            "daily_visitors": daily_visitors,
+            "top_songs": songs
+        })
+    except Exception as e:
+        print("Stats error:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
