@@ -9,6 +9,7 @@ from lyrics_processor import process_lyrics_text
 from colorthief import ColorThief
 import io
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
 
@@ -48,6 +49,25 @@ class TrackLyrics(db.Model):
 class DailyVisitor(db.Model):
     date = db.Column(db.Date, primary_key=True)
     count = db.Column(db.Integer, default=0)
+
+class ArtistBoard(db.Model):
+    id = db.Column(db.String(100), primary_key=True) # Spotify Artist ID
+    name = db.Column(db.String(255), nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ArtistComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    artist_id = db.Column(db.String(100), nullable=False)
+    parent_id = db.Column(db.Integer, nullable=True)
+    nickname = db.Column(db.String(100), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    track_id = db.Column(db.String(100), nullable=False)
+    track_name = db.Column(db.String(255), nullable=True)
+    track_artist = db.Column(db.String(255), nullable=True)
+    track_image = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
     db.create_all()
@@ -359,7 +379,7 @@ def youtube_search():
 def get_songlist():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    pagination = TrackLyrics.query.order_by(TrackLyrics.likes.desc(), TrackLyrics.title.asc()).paginate(page=page, per_page=per_page, error_out=False)
+    pagination = TrackLyrics.query.order_by(TrackLyrics.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     
     songs = []
     for track in pagination.items:
@@ -718,6 +738,179 @@ def new_update_rankT():
 @app.route('/engcross/newfour', methods=['GET'])
 def new_update_rankO():
     return update_new_rank("data/engcross/newOfficerRank.json")
+
+#########################################################################
+# Artist Board API
+
+@app.route('/api/spotify/search/artist', methods=['GET'])
+def spotify_search_artist():
+    query = request.args.get('q')
+    if not query:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+    try:
+        token = get_spotify_token()
+        url = f"https://api.spotify.com/v1/search?q={query}&type=artist&limit=10"
+        headers = {"Authorization": f"Bearer {token}"}
+        result = requests.get(url, headers=headers)
+        return jsonify(result.json())
+    except Exception as e:
+        print("Spotify artist search error:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/artists', methods=['GET'])
+def get_artists():
+    try:
+        from sqlalchemy import func
+        subq = db.session.query(
+            ArtistComment.artist_id,
+            func.max(ArtistComment.created_at).label('last_comment_time')
+        ).group_by(ArtistComment.artist_id).subquery()
+
+        artists = db.session.query(ArtistBoard, subq.c.last_comment_time)\
+            .outerjoin(subq, ArtistBoard.id == subq.c.artist_id)\
+            .order_by(db.desc(func.coalesce(subq.c.last_comment_time, ArtistBoard.created_at)))\
+            .all()
+
+        result = []
+        for a, last_time in artists:
+            result.append({
+                "id": a.id,
+                "name": a.name,
+                "image_url": a.image_url,
+                "created_at": a.created_at.isoformat() if a.created_at else None
+            })
+        return jsonify({"artists": result})
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/artists', methods=['POST'])
+def create_artist():
+    data = request.json
+    artist_id = data.get('id')
+    name = data.get('name')
+    image_url = data.get('image_url')
+
+    if not all([artist_id, name]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    artist = ArtistBoard.query.get(artist_id)
+    if not artist:
+        artist = ArtistBoard(
+            id=artist_id,
+            name=name,
+            image_url=image_url
+        )
+        db.session.add(artist)
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"success": True, "artist_id": artist.id})
+
+@app.route('/api/artists/<artist_id>', methods=['GET'])
+def get_artist(artist_id):
+    a = ArtistBoard.query.get(artist_id)
+    if not a:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({
+        "id": a.id,
+        "name": a.name,
+        "image_url": a.image_url,
+        "created_at": a.created_at.isoformat() if a.created_at else None
+    })
+
+@app.route('/api/artists/<artist_id>/comments', methods=['GET'])
+def get_artist_comments(artist_id):
+    try:
+        comments = ArtistComment.query.filter_by(artist_id=artist_id).order_by(ArtistComment.created_at.desc()).all()
+        result = []
+        for c in comments:
+            result.append({
+                "id": c.id,
+                "parent_id": c.parent_id,
+                "nickname": c.nickname,
+                "content": c.content,
+                "track_id": c.track_id,
+                "track_name": c.track_name,
+                "track_artist": c.track_artist,
+                "track_image": c.track_image,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            })
+        return jsonify({"comments": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/artists/<artist_id>/comments', methods=['POST'])
+def create_artist_comment(artist_id):
+    data = request.json
+    nickname = data.get('nickname')
+    password = data.get('password')
+    content = data.get('content')
+    track_id = data.get('track_id')
+    parent_id = data.get('parent_id')
+    track_name = data.get('track_name')
+    track_artist = data.get('track_artist')
+    track_image = data.get('track_image')
+
+    if not all([nickname, password, content, track_id]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    comment = ArtistComment(
+        artist_id=artist_id,
+        parent_id=parent_id,
+        nickname=nickname,
+        password_hash=generate_password_hash(password),
+        content=content,
+        track_id=track_id,
+        track_name=track_name,
+        track_artist=track_artist,
+        track_image=track_image
+    )
+    db.session.add(comment)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+    return jsonify({"success": True, "comment_id": comment.id})
+
+@app.route('/api/artists/comments/<int:comment_id>', methods=['PUT', 'DELETE'])
+def modify_artist_comment(comment_id):
+    comment = ArtistComment.query.get(comment_id)
+    if not comment:
+        return jsonify({"error": "Comment not found"}), 404
+
+    data = request.json or {}
+    password = data.get('password')
+    if not password or not check_password_hash(comment.password_hash, password):
+        return jsonify({"error": "Incorrect password"}), 403
+
+    if request.method == 'DELETE':
+        db.session.delete(comment)
+        children = ArtistComment.query.filter_by(parent_id=comment_id).all()
+        for child in children:
+            db.session.delete(child)
+        try:
+            db.session.commit()
+            return jsonify({"success": True})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+            
+    elif request.method == 'PUT':
+        content = data.get('content')
+        if content:
+            comment.content = content
+            try:
+                db.session.commit()
+                return jsonify({"success": True})
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Missing content"}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

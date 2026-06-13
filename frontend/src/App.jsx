@@ -349,12 +349,14 @@ function App() {
     (async () => {
       try {
         setLyrics("가사를 불러오는 중입니다...");
-        const dbRes = await fetch(`/api/lyrics/${track.id}`);
-        if (dbRes.ok) {
-          const dbData = await dbRes.json();
-          if (dbData && dbData.length > 0) {
-            setLyrics(dbData);
-            return; // Exit early, no need for LRCLIB!
+        const checkRes = await fetch(`/api/lyrics/${track.id}`);
+        if (checkRes.ok) {
+          const dbData = await checkRes.json();
+          if (Array.isArray(dbData) && dbData.length === 0) {
+            // DB has the track but no lyrics yet (e.g. created by likes). Fall through to LRCLIB.
+          } else {
+            if (currentTrackIdRef.current === track.id) setLyrics(dbData);
+            return;
           }
         }
       } catch (err) {
@@ -535,7 +537,8 @@ function App() {
       style={dynamicTheme || {}}
     >
       <div className="search-wrapper">
-        <Link to="/japanese-quiz" className="quiz-btn" title="일본어 퀴즈">🎮</Link>
+        <Link to="/japanese-quiz" className="quiz-btn" title="일본어 퀴즈"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg></Link>
+        <Link to="/artists" className="artist-board-btn" title="아티스트 게시판"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></Link>
         <h1 className="logo-text" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>코난수집함</h1>
         
         <div className="search-and-results-wrapper" ref={searchWrapperRef}>

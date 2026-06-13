@@ -118,7 +118,7 @@ export default function JapaneseQuiz() {
       <div className="quiz-inner">
         <header className="quiz-header">
           <Link to="/" className="quiz-back-link">← 메인으로</Link>
-          <h1 className="quiz-title">🎮 일본어 퀴즈 (5초 서바이벌)</h1>
+          <h1 className="quiz-title"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'10px', verticalAlign:'middle'}}><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg>일본어 퀴즈 (5초 서바이벌)</h1>
         </header>
 
         {mode === 'start' && (

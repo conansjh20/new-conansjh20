@@ -37,7 +37,7 @@
   width: 100%;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', Arial, sans-serif;
+
   padding-top: 2vh;
   transition: background-color 0.4s ease, color 0.4s ease, padding-top 0.4s ease;
 }
@@ -78,6 +78,30 @@
 }
 
 .quiz-btn:hover {
+  transform: scale(1.1);
+}
+
+.artist-board-btn {
+  position: absolute;
+  top: 30px;
+  left: 20px;
+  text-decoration: none;
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: transform 0.2s, top 0.4s ease;
+  z-index: 100;
+}
+
+.has-selection .artist-board-btn {
+  top: 12px;
+}
+
+.artist-board-btn:hover {
   transform: scale(1.1);
 }
 
@@ -371,7 +395,7 @@
 }
 
 .lyrics-text {
-  font-family: 'Inter', 'Roboto', sans-serif;
+
   font-size: 0.95rem;
   line-height: 1.6;
   color: var(--text-primary);
@@ -428,7 +452,7 @@
   background: var(--bg-secondary);
   color: var(--text-primary);
   padding: 12px;
-  font-family: 'Inter', sans-serif;
+
   font-size: 0.9rem;
   resize: vertical;
   box-sizing: border-box;
@@ -692,6 +716,16 @@
   .has-selection .quiz-btn {
     top: 0px;
     right: 15px;
+  }
+
+  .artist-board-btn {
+    top: 14px;
+    left: 15px;
+  }
+
+  .has-selection .artist-board-btn {
+    top: 0px;
+    left: 15px;
   }
 
   .has-selection .logo-text {

@@ -17,20 +17,23 @@ export default function About() {
 
   return (
     <div className="main-container light-mode" style={{ justifyContent: 'center', paddingTop: 0, minHeight: '100vh', overflow: 'hidden' }}>
-      <div style={{ maxWidth: '900px', width: '100%', padding: '60px 20px', textAlign: 'center' }}>
+      <div style={{ maxWidth: '900px', width: '100%', padding: '20px', textAlign: 'center' }}>
         <h1 style={{ marginBottom: '30px', color: 'var(--text-primary)', fontSize: '2.5rem' }}>코난수집함 소개</h1>
         
         <p style={{ 
           color: 'var(--text-secondary)', 
-          marginBottom: '80px', 
+          marginBottom: '20px', 
           fontSize: '1.2rem', 
           lineHeight: '1.8',
           fontWeight: '500'
         }}>
-          컴퓨터와 코딩, J-POP이 좋아 만든 홈페이지 입니다.
+          컴퓨터와 코딩, J-POP이 좋아 만든 홈페이지 입니다.<br/>
+          <a href="https://github.com/conansjh20/new-conansjh20" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 'bold' }}>
+            GitHub: conansjh20/new-conansjh20
+          </a>
         </p>
 
-        <div style={{ marginBottom: '80px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
           <div style={{ 
             position: 'relative',
             width: '380px', 
@@ -38,7 +41,7 @@ export default function About() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '40px 0'
+            margin: '10px 0'
           }}>
             {techStack.map((tech, idx) => {
               // Sunflower/Fermat's spiral pattern to naturally scatter them inside a circle
@@ -108,13 +111,13 @@ export default function About() {
             display: 'inline-block',
             textDecoration: 'none', 
             color: '#fff', 
-            background: 'var(--accent-gradient)', 
+            background: '#808080', 
             padding: '12px 30px', 
             borderRadius: '30px', 
             fontWeight: 'bold',
             boxShadow: '0 4px 15px var(--shadow-color)',
             transition: 'transform 0.2s',
-            marginTop: '40px'
+            marginTop: '10px'
           }}
           onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
           onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
