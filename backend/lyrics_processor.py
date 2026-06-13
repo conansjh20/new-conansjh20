@@ -1,7 +1,8 @@
 import re
 import MeCab
 import jaconv
-from deep_translator import GoogleTranslator
+import os
+import requests
 import eng_to_ipa as ipa
 from phonetic_learning import phonetic
 jap_one_syl = ["あ", "か", "さ", "た", "な", "は", "ま", "や", "ら", "わ", "が", "ざ", "だ", "ば", "ぱ",
@@ -70,9 +71,6 @@ def furitohan_str(line):
     for idx, item in enumerate(jap_one_syl):
         line = line.replace(item, kor_one_syl[idx])
     return line
-
-# Initialize translation API outside to reuse
-translator = GoogleTranslator(source='ja', target='ko')
 
 def correct_furi(lyrics: str):
     return lyrics.replace("君", "きみ")\
@@ -193,25 +191,36 @@ def process_lyrics_text(raw_lyrics):
         })
     # Batch Translation
     if lines_to_translate:
-        # Google Translate preserves '\n' well. We join with newlines.
         text_to_translate = "\n".join(lines_to_translate)
         try:
-            # Force auto detection so both English and Japanese songs translate perfectly
-            t = GoogleTranslator(source='auto', target='ko')
-            # Translate up to 5000 chars at once (API limit)
-            # Most lyrics are ~1000 chars
-            translated_text = t.translate(text_to_translate[:4999])
-            
-            if translated_text:
-                translated_lines = translated_text.split('\n')
+            deepl_api_key = os.environ.get("DEEPL_API_KEY", "")
+            if deepl_api_key:
+                endpoint = "https://api-free.deepl.com/v2/translate" if deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
+                headers = {
+                    "Authorization": f"DeepL-Auth-Key {deepl_api_key}",
+                    "Content-Type": "application/json"
+                }
+                data = {
+                    "text": [text_to_translate],
+                    "target_lang": "KO"
+                }
                 
-                # Sometimes Google Translate returns slightly fewer/more lines.
-                # We map as closely as possible.
-                for i, r in enumerate(results):
-                    if i < len(translated_lines):
-                        r["translation"] = translated_lines[i]
-                    else:
-                        r["translation"] = ""
+                response = requests.post(endpoint, headers=headers, json=data)
+                response.raise_for_status()
+                result = response.json()
+                
+                translated_text = result["translations"][0]["text"]
+                
+                if translated_text:
+                    translated_lines = translated_text.split('\n')
+                    for i, r in enumerate(results):
+                        if i < len(translated_lines):
+                            r["translation"] = translated_lines[i]
+                        else:
+                            r["translation"] = ""
+            else:
+                for r in results:
+                    r["translation"] = "(번역 API 키 없음)"
         except Exception as e:
             print("Batch translate error:", e)
             for r in results:
