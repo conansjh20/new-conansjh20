@@ -688,12 +688,6 @@ function App() {
                     {showHeartAnim && <div className="floating-heart">❤️</div>}
                   </button>
                 </div>
-                {trackInfo && trackInfo.title && trackInfo.title.translation && trackInfo.title.translation !== selectedTrack.name && (
-                  <p className="track-meta-title" style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '8px', lineHeight: '1.2' }}>
-                    {trackInfo.title.pronunciation && trackInfo.title.pronunciation !== selectedTrack.name ? <span style={{opacity: 0.8, marginRight: '4px'}}>({trackInfo.title.pronunciation})</span> : null}
-                    <span style={{fontWeight: '500'}}>{trackInfo.title.translation}</span>
-                  </p>
-                )}
                 <p className="track-artist">
                   {selectedTrack.artists.map((a, i) => (
                     <span key={a.id}>
@@ -709,12 +703,6 @@ function App() {
                   ))}
                 </p>
                 <p className="track-album">Album: {selectedTrack.album.name}</p>
-                {trackInfo && trackInfo.album && trackInfo.album.translation && trackInfo.album.translation !== selectedTrack.album.name && (
-                  <p className="track-meta-album" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '4px', lineHeight: '1.2' }}>
-                    {trackInfo.album.pronunciation && trackInfo.album.pronunciation !== selectedTrack.album.name ? <span style={{opacity: 0.8, marginRight: '4px'}}>({trackInfo.album.pronunciation})</span> : null}
-                    {trackInfo.album.translation}
-                  </p>
-                )}
                 <p className="track-year">Released: {selectedTrack.album.release_date?.split('-')[0]}</p>
               </div>
             </div>
