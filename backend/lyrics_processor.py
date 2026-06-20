@@ -155,13 +155,13 @@ def process_lyrics_text(raw_lyrics):
                 parts = token.split('\t')
                 surface = parts[0]
                 
-                if len(parts) > 2 and parts[2] != '*':
-                    reading = parts[2]
-                    katakana_reading += reading
-                    is_japanese_line = True
-                elif len(parts) > 1 and parts[1] != '*':
+                if len(parts) > 1 and parts[1] != '*' and not ',' in parts[1]:
                     pronunciation = parts[1]
                     katakana_reading += pronunciation
+                    is_japanese_line = True
+                elif len(parts) > 2 and parts[2] != '*':
+                    reading = parts[2]
+                    katakana_reading += reading
                     is_japanese_line = True
                 else:
                     katakana_reading += surface
