@@ -10,10 +10,13 @@ from colorthief import ColorThief
 import io
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import pymysql
+from sqlalchemy import text
+from datetime import datetime
+from flask import make_response
+from sqlalchemy.exc import IntegrityError
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
-
-from datetime import datetime
 
 # .env 파일 로드
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -27,7 +30,12 @@ if os.path.exists(env_path):
 
 # DB Configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
+# 기존 가사 앱용 SQLite 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'lyrics.db'))
+# 새 기타 프리셋용 MySQL 바인드 설정 추가
+app.config['SQLALCHEMY_BINDS'] = {
+    'guitar_db': 'mysql+pymysql://conansjh20:P020673#1@conansjh20.mysql.pythonanywhere-services.com/conansjh20$guitar'
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -69,6 +77,17 @@ class ArtistComment(db.Model):
     track_image = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class GuitarPreset(db.Model):
+    __bind_key__ = 'guitar_db'    # 이 모델만 MySQL(guitar_db)을 사용하도록 강제 지정!
+    __tablename__ = 'guitar_presets'
+
+    id = db.Column(db.String(36), primary_key=True) # UUID string
+    name = db.Column(db.String(255), nullable=False)
+    artist_name = db.Column(db.String(255))
+    bpm = db.Column(db.Float, default=90.0)
+    row_count = db.Column(db.Integer, default=4)
+    data = db.Column(db.JSON, nullable=False) # 전체 JSON 프리셋 데이터
+
 with app.app_context():
     db.create_all()
     try:
@@ -77,21 +96,21 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
-        
+
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN youtube_video_id VARCHAR(100)"))
         db.session.commit()
     except Exception:
         db.session.rollback()
-        
+
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN youtube_video_ids TEXT"))
         db.session.commit()
     except Exception:
         db.session.rollback()
-        
+
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE track_lyrics ADD COLUMN translated_title_info TEXT"))
@@ -100,9 +119,6 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
-
-from flask import make_response
-from sqlalchemy.exc import IntegrityError
 
 def get_or_create_track(track_id, **kwargs):
     track = TrackLyrics.query.get(track_id)
@@ -137,18 +153,19 @@ def not_found(e):
     legacy_dir = '/home/conansjh20/static'
     req_path = request.path.lstrip('/')
     legacy_file = os.path.join(legacy_dir, req_path)
-    
+
     # 보안: 파일 경로가 legacy_dir 내부에 있는지 확인 (경로 조작 방지)
     if os.path.exists(legacy_file) and os.path.isfile(legacy_file):
         # 상위 폴더 접근(..) 차단
         if os.path.abspath(legacy_file).startswith(os.path.abspath(legacy_dir)):
             return send_from_directory(legacy_dir, req_path)
-            
+
     response = make_response(send_from_directory(app.static_folder, 'index.html'))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
 CORS(app)  # 개발 환경에서 프론트엔드와 백엔드 포트가 다를 때 CORS 문제 방지
 
 @app.route('/api/hello', methods=['GET'])
@@ -177,18 +194,18 @@ def get_stats():
     try:
         from datetime import date
         from sqlalchemy import func
-        
+
         # 1. Total visitors
         total_visitors = db.session.query(func.sum(DailyVisitor.count)).scalar() or 0
-        
+
         # 2. Daily visitors (today)
         today = date.today()
         today_visitor = DailyVisitor.query.get(today)
         daily_visitors = today_visitor.count if today_visitor else 0
-        
+
         # 3. Top clicked songs (ordered by play_count)
         top_tracks = TrackLyrics.query.filter(TrackLyrics.play_count != None).order_by(TrackLyrics.play_count.desc()).limit(20).all()
-        
+
         songs = []
         for track in top_tracks:
             songs.append({
@@ -198,7 +215,7 @@ def get_stats():
                 "cover_url": track.cover_url,
                 "play_count": track.play_count or 0
             })
-            
+
         return jsonify({
             "total_visitors": total_visitors,
             "daily_visitors": daily_visitors,
@@ -216,7 +233,7 @@ def get_spotify_token():
     auth_string = f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}"
     auth_bytes = auth_string.encode("utf-8")
     auth_base64 = str(base64.b64encode(auth_bytes), "utf-8")
-    
+
     url = "https://accounts.spotify.com/api/token"
     headers = {
         "Authorization": f"Basic {auth_base64}",
@@ -233,10 +250,10 @@ def spotify_search():
     query = request.args.get('q')
     if not query:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
-        
+
     items = []
     seen_ids = set()
-    
+
     # 1. Search in local database first
     try:
         db_tracks = TrackLyrics.query.filter(
@@ -245,7 +262,7 @@ def spotify_search():
                 TrackLyrics.artist.ilike(f'%{query}%')
             )
         ).limit(10).all()
-        
+
         for t in db_tracks:
             items.append({
                 "id": t.id,
@@ -261,7 +278,7 @@ def spotify_search():
             seen_ids.add(t.id)
     except Exception as e:
         print("DB search error:", e)
-        
+
     # 2. Fetch from Spotify API if we need more results
     if len(items) < 15:
         try:
@@ -270,10 +287,10 @@ def spotify_search():
             headers = {
                 "Authorization": f"Bearer {token}"
             }
-            
+
             result = requests.get(url, headers=headers)
             spotify_data = result.json()
-            
+
             if "tracks" in spotify_data and "items" in spotify_data["tracks"]:
                 for st in spotify_data["tracks"]["items"]:
                     if st["id"] not in seen_ids:
@@ -283,7 +300,7 @@ def spotify_search():
                             break
         except Exception as e:
             print("Spotify search error:", e)
-            
+
     return jsonify({"tracks": {"items": items}})
 
 @app.route('/api/spotify/artist/<artist_id>/top-tracks', methods=['GET'])
@@ -293,7 +310,7 @@ def spotify_artist_top_tracks(artist_id):
     headers = {
         "Authorization": f"Bearer {token}"
     }
-    
+
     result = requests.get(url, headers=headers)
     return jsonify(json.loads(result.content))
 
@@ -301,23 +318,23 @@ def spotify_artist_top_tracks(artist_id):
 def get_playlist_latest(playlist_id):
     token = get_spotify_token()
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     playlist_url = f"https://api.spotify.com/v1/playlists/{playlist_id}"
     res = requests.get(playlist_url, headers=headers)
     data = res.json()
     total = data.get('tracks', {}).get('total', 0)
-    
+
     if total > 0:
         offset = max(0, total - 50)
         tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=50&offset={offset}&market=KR"
         res2 = requests.get(tracks_url, headers=headers)
         data2 = res2.json()
-        
+
         items = data2.get('items', [])
         items.reverse()
         result_tracks = [item['track'] for item in items if item.get('track')][:50]
         return jsonify({"tracks": result_tracks})
-    
+
     return jsonify({"tracks": []})
 
 
@@ -327,7 +344,7 @@ YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 def youtube_search():
     query = request.args.get('q')
     track_id = request.args.get('track_id')
-    
+
     if not query:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
 
@@ -342,12 +359,12 @@ def youtube_search():
                 pass
         elif track and track.youtube_video_id:
             return jsonify({"videoIds": [track.youtube_video_id], "videoId": track.youtube_video_id})
-        
+
     url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&videoEmbeddable=true&key={YOUTUBE_API_KEY}&maxResults=15"
-    
+
     video_ids = []
     seen = set()
-    
+
     try:
         res = requests.get(url).json()
         if "items" in res:
@@ -358,10 +375,10 @@ def youtube_search():
                     seen.add(vid)
     except Exception as e:
         print("Youtube search error:", e)
-            
+
     if len(video_ids) > 0:
         first_video_id = video_ids[0]
-        
+
         if track_id:
             track = get_or_create_track(track_id)
             track.youtube_video_id = first_video_id
@@ -370,7 +387,7 @@ def youtube_search():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            
+
         return jsonify({"videoIds": video_ids, "videoId": first_video_id})
     else:
         return jsonify({"error": "No video found"}), 404
@@ -380,7 +397,7 @@ def get_songlist():
     page = request.args.get('page', 1, type=int)
     per_page = 10
     pagination = TrackLyrics.query.order_by(TrackLyrics.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    
+
     songs = []
     for track in pagination.items:
         songs.append({
@@ -397,7 +414,7 @@ def get_songlist():
             "theme_colors": json.loads(track.theme_colors) if getattr(track, 'theme_colors', None) else None,
             "lyrics": json.loads(track.processed_data) if track.processed_data else []
         })
-        
+
     return jsonify({
         "songs": songs,
         "total_pages": pagination.pages,
@@ -421,7 +438,7 @@ def update_song(track_id):
     track = TrackLyrics.query.get(track_id)
     if not track:
         return jsonify({"error": "Not found"}), 404
-        
+
     data = request.json
     if 'title' in data:
         track.title = data['title']
@@ -429,7 +446,7 @@ def update_song(track_id):
         track.artist = data['artist']
     if 'lyrics' in data:
         track.processed_data = json.dumps(data['lyrics'])
-        
+
     db.session.commit()
     return jsonify({"message": "Updated successfully"})
 
@@ -438,7 +455,7 @@ def delete_song(track_id):
     track = TrackLyrics.query.get(track_id)
     if not track:
         return jsonify({"error": "Not found"}), 404
-        
+
     db.session.delete(track)
     db.session.commit()
     return jsonify({"message": "Deleted successfully"})
@@ -451,7 +468,7 @@ def translate_info():
     cover_url = data.get('cover_url')
     title_raw = data.get('title', '')
     album_raw = data.get('album', '')
-    
+
     if track_id:
         track = get_or_create_track(track_id)
         updated = False
@@ -469,22 +486,22 @@ def translate_info():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-                
+
         if track and track.translated_title_info:
             return jsonify({
                 "title": json.loads(track.translated_title_info),
                 "album": json.loads(track.translated_album_info) if track.translated_album_info else None
             })
-            
+
     title = data.get('title', '')
     album = data.get('album', '')
-    
+
     title_proc = process_lyrics_text(title)
     title_info = title_proc[0] if title_proc else None
-    
+
     album_proc = process_lyrics_text(album)
     album_info = album_proc[0] if album_proc else None
-    
+
     if track_id:
         track = get_or_create_track(track_id)
         if title_info:
@@ -495,7 +512,7 @@ def translate_info():
             db.session.commit()
         except Exception:
             db.session.rollback()
-    
+
     return jsonify({
         "title": title_info,
         "album": album_info
@@ -506,15 +523,15 @@ def process_lyrics():
     data = request.json
     if not data or 'lyrics' not in data:
         return jsonify({"error": "No lyrics provided"}), 400
-        
+
     raw_lyrics = data['lyrics']
     track_id = data.get('track_id')
     title = data.get('title')
     artist = data.get('artist')
     cover_url = data.get('cover_url')
-    
+
     processed = process_lyrics_text(raw_lyrics)
-    
+
     # DB 저장 로직
     if track_id:
         existing_track = get_or_create_track(track_id, title=title, artist=artist, cover_url=cover_url)
@@ -526,7 +543,7 @@ def process_lyrics():
             db.session.commit()
         except Exception:
             db.session.rollback()
-        
+
     return jsonify(processed)
 
 @app.route('/api/song/<track_id>/likes', methods=['GET'])
@@ -563,24 +580,24 @@ def get_color():
     track_id = request.args.get('track_id')
     if not img_url:
         return jsonify({"error": "No url provided"}), 400
-        
+
     if track_id:
         track = TrackLyrics.query.get(track_id)
         if track and track.theme_colors:
             return jsonify(json.loads(track.theme_colors))
-            
+
     try:
         r = requests.get(img_url, timeout=5)
         f = io.BytesIO(r.content)
         color_thief = ColorThief(f)
         dominant_color = color_thief.get_color(quality=10)
         palette = color_thief.get_palette(color_count=4, quality=10)
-        
+
         result = {
             "dominant": dominant_color,
             "palette": palette
         }
-        
+
         if track_id:
             track = get_or_create_track(track_id)
             track.theme_colors = json.dumps(result)
@@ -588,7 +605,7 @@ def get_color():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            
+
         return jsonify(result)
     except Exception as e:
         print("Color extraction failed:", e)
@@ -607,7 +624,6 @@ def spotify_get_track(track_id):
             return jsonify({"error": "Failed to fetch track"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 ##########################################################
 # 라디오 라우트
@@ -654,263 +670,182 @@ def get_channel7():
         return jsonify(data)
 
 #############################################################
-# Engcross 신버전 Helper Functions
+# Engcross 신버전 Helper Functions (MySQL 연동으로 변경)
 
-def read_json(filepath):
-    """지정된 경로의 JSON 파일을 읽어서 파이썬 딕셔너리로 반환합니다."""
-    if not os.path.exists(filepath):
-        return {}
-    with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
+def get_engcross_db_connection():
+    host = os.environ.get('ENGCROSS_DB_HOST', 'conansjh20.mysql.pythonanywhere-services.com')
+    user = os.environ.get('ENGCROSS_DB_USER', 'conansjh20')
+    password = os.environ.get('ENGCROSS_DB_PASS', 'P020673#1')
+    db_name = os.environ.get('ENGCROSS_DB_NAME', 'conansjh20$english')
 
-def write_json(filepath, data):
-    """파이썬 딕셔너리 데이터를 지정된 경로의 JSON 파일로 저장합니다."""
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+    return pymysql.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=db_name,
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor
+    )
 
-def check_new_rank(filepath):
-    """랭킹 조회 공통 로직: JSON을 읽어 {이름: 점수} 형태로 반환"""
-    result = read_json(filepath)
-    # result = {"홍길동": [1, "1234"], ...} 
-    # new_result = {"홍길동": 1, ...} 로 변환
-    new_result = {key: value[0] for key, value in result.items()}
-    return jsonify(new_result)
+def check_new_rank(level):
+    try:
+        conn = get_engcross_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT name, score FROM engcross_leaderboard WHERE level = %s ORDER BY score DESC", (level,))
+            rows = cursor.fetchall()
+            new_result = {row['name']: row['score'] for row in rows}
+            return jsonify(new_result)
+    except Exception as e:
+        print("Engcross DB Error:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals() and conn.open:
+            conn.close()
 
-def update_new_rank(filepath):
-    """랭킹 업데이트 공통 로직: name, password를 확인하고 점수를 올리거나 새로 추가"""
-    name = request.args.get("name")
-    password = request.args.get("password")
-    
-    # 인자 누락 에러 방지 처리 (KeyError 방지)
+def update_new_rank(level):
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        name = data.get("name")
+        password = data.get("password")
+    else:
+        name = request.args.get("name")
+        password = request.args.get("password")
+
     if not name or not password:
         return "Missing name or password", 400
 
-    rank = read_json(filepath)
-    
-    if name in rank:
-        # 기존 유저일 경우 비밀번호 확인
-        if password == rank[name][1]:
-            rank[name][0] += 1
-            write_json(filepath, rank)
-            return "updated"
-        else:
-            return "wrongPass"
-    else:
-        # 신규 유저일 경우 추가
-        rank[name] = [1, password]
-        write_json(filepath, rank)
-        return "new"
+    try:
+        conn = get_engcross_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT password, score FROM engcross_leaderboard WHERE level = %s AND name = %s", (level, name))
+            user = cursor.fetchone()
+
+            if user:
+                if str(password) == str(user['password']):
+                    new_score = user['score'] + 1
+                    cursor.execute("UPDATE engcross_leaderboard SET score = %s WHERE level = %s AND name = %s", (new_score, level, name))
+                    conn.commit()
+                    return "updated"
+                else:
+                    return "wrongPass"
+            else:
+                cursor.execute("INSERT INTO engcross_leaderboard (level, name, password, score) VALUES (%s, %s, %s, %s)", (level, name, password, 1))
+                conn.commit()
+                return "new"
+    except Exception as e:
+        print("Engcross DB Error:", e)
+        return f"Error: {str(e)}", 500
+    finally:
+        if 'conn' in locals() and conn.open:
+            conn.close()
 
 #########################################################################
 # Engcross 신버전 API (랭킹 조회)
 
 @app.route('/engcross/newrankelementary', methods=['GET'])
 def check_new_rank_elementary():
-    return check_new_rank("data/engcross/newElementaryRank.json")
+    return check_new_rank('1')
 
 @app.route('/engcross/newrankmiddlehigh', methods=['GET'])
 def check_new_rank_middlehigh():
-    return check_new_rank("data/engcross/newMiddlehighRank.json")
+    return check_new_rank('2')
 
 @app.route('/engcross/newranktoeic', methods=['GET'])
 def check_new_rank_toeic():
-    return check_new_rank("data/engcross/newToeicRank.json")
+    return check_new_rank('3')
 
 @app.route('/engcross/newrankofficer', methods=['GET'])
 def check_new_rank_officer():
-    return check_new_rank("data/engcross/newOfficerRank.json")
+    return check_new_rank('4')
 
 #########################################################################
 # Engcross 신버전 API (랭킹 업데이트)
 
-@app.route('/engcross/newone', methods=['GET'])
+@app.route('/engcross/newone', methods=['GET', 'POST'])
 def new_update_rankE():
-    return update_new_rank("data/engcross/newElementaryRank.json")
+    return update_new_rank('1')
 
-@app.route('/engcross/newtwo', methods=['GET'])
+@app.route('/engcross/newtwo', methods=['GET', 'POST'])
 def new_update_rankM():
-    return update_new_rank("data/engcross/newMiddlehighRank.json")
+    return update_new_rank('2')
 
-@app.route('/engcross/newthree', methods=['GET'])
+@app.route('/engcross/newthree', methods=['GET', 'POST'])
 def new_update_rankT():
-    return update_new_rank("data/engcross/newToeicRank.json")
+    return update_new_rank('3')
 
-@app.route('/engcross/newfour', methods=['GET'])
+@app.route('/engcross/newfour', methods=['GET', 'POST'])
 def new_update_rankO():
-    return update_new_rank("data/engcross/newOfficerRank.json")
+    return update_new_rank('4')
 
 #########################################################################
-# Artist Board API
+# While My Guitar API
 
-@app.route('/api/spotify/search/artist', methods=['GET'])
-def spotify_search_artist():
-    query = request.args.get('q')
-    if not query:
-        return jsonify({"error": "Query parameter 'q' is required"}), 400
+@app.route('/api/presets', methods=['GET'])
+def get_guitar_presets():
+    """앱의 목록에 띄워줄 프리셋 기본 정보만 반환"""
+    presets = GuitarPreset.query.all()
+    result = []
+    for p in presets:
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "artistName": p.artist_name,
+            "bpm": p.bpm,
+            "rowCount": p.row_count
+        })
+    return jsonify(result)
+
+@app.route('/api/presets/<preset_id>', methods=['GET'])
+def get_guitar_preset_detail(preset_id):
+    """사용자가 다운로드를 눌렀을 때, 프리셋의 전체 JSON 반환"""
+    preset = GuitarPreset.query.get(preset_id)
+    if preset:
+        return jsonify(preset.data)
+    return jsonify({"error": "Preset not found"}), 404
+
+
+#########################################################################
+# 단어 찾기 게임 (Word Search) API - 정확한 MySQL 연동
+
+@app.route('/engcross/wordsearch/categories', methods=['GET'])
+def get_wordsearch_categories():
     try:
-        token = get_spotify_token()
-        url = f"https://api.spotify.com/v1/search?q={query}&type=artist&limit=10"
-        headers = {"Authorization": f"Bearer {token}"}
-        result = requests.get(url, headers=headers)
-        return jsonify(result.json())
+        conn = get_engcross_db_connection()
+        with conn.cursor() as cursor:
+            # 앱에서는 'name'을 기대하므로 name_ko를 name으로 변경해서(AS name) 가져옵니다.
+            cursor.execute("SELECT code, name_ko AS name FROM wordsearch_category")
+            categories = cursor.fetchall()
+            return jsonify(categories)
     except Exception as e:
-        print("Spotify artist search error:", e)
+        print("Category DB Error:", e)
         return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals() and conn.open:
+            conn.close()
 
-@app.route('/api/artists', methods=['GET'])
-def get_artists():
+@app.route('/engcross/wordsearch/words', methods=['GET'])
+def get_wordsearch_words():
+    category_code = request.args.get('category')
+    if not category_code:
+        return jsonify({"error": "Missing category parameter"}), 400
+
     try:
-        from sqlalchemy import func
-        subq = db.session.query(
-            ArtistComment.artist_id,
-            func.max(ArtistComment.created_at).label('last_comment_time')
-        ).group_by(ArtistComment.artist_id).subquery()
-
-        artists = db.session.query(ArtistBoard, subq.c.last_comment_time)\
-            .outerjoin(subq, ArtistBoard.id == subq.c.artist_id)\
-            .order_by(db.desc(func.coalesce(subq.c.last_comment_time, ArtistBoard.created_at)))\
-            .all()
-
-        result = []
-        for a, last_time in artists:
-            result.append({
-                "id": a.id,
-                "name": a.name,
-                "image_url": a.image_url,
-                "created_at": a.created_at.isoformat() if a.created_at else None
-            })
-        return jsonify({"artists": result})
+        conn = get_engcross_db_connection()
+        with conn.cursor() as cursor:
+            # 사용자가 누른 카테고리 코드('animals' 등)로 wordsearch_category와 조인하여
+            # 해당하는 category_id를 가진 단어들의 ko, en 값만 조회합니다.
+            sql = """
+                SELECT w.ko, w.en
+                FROM wordsearch_word w
+                JOIN wordsearch_category c ON w.category_id = c.id
+                WHERE c.code = %s
+            """
+            cursor.execute(sql, (category_code,))
+            words = cursor.fetchall()
+            return jsonify(words)
     except Exception as e:
-        print(e)
+        print("Word DB Error:", e)
         return jsonify({"error": str(e)}), 500
-
-@app.route('/api/artists', methods=['POST'])
-def create_artist():
-    data = request.json
-    artist_id = data.get('id')
-    name = data.get('name')
-    image_url = data.get('image_url')
-
-    if not all([artist_id, name]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    artist = ArtistBoard.query.get(artist_id)
-    if not artist:
-        artist = ArtistBoard(
-            id=artist_id,
-            name=name,
-            image_url=image_url
-        )
-        db.session.add(artist)
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
-    return jsonify({"success": True, "artist_id": artist.id})
-
-@app.route('/api/artists/<artist_id>', methods=['GET'])
-def get_artist(artist_id):
-    a = ArtistBoard.query.get(artist_id)
-    if not a:
-        return jsonify({"error": "Not found"}), 404
-    return jsonify({
-        "id": a.id,
-        "name": a.name,
-        "image_url": a.image_url,
-        "created_at": a.created_at.isoformat() if a.created_at else None
-    })
-
-@app.route('/api/artists/<artist_id>/comments', methods=['GET'])
-def get_artist_comments(artist_id):
-    try:
-        comments = ArtistComment.query.filter_by(artist_id=artist_id).order_by(ArtistComment.created_at.desc()).all()
-        result = []
-        for c in comments:
-            result.append({
-                "id": c.id,
-                "parent_id": c.parent_id,
-                "nickname": c.nickname,
-                "content": c.content,
-                "track_id": c.track_id,
-                "track_name": c.track_name,
-                "track_artist": c.track_artist,
-                "track_image": c.track_image,
-                "created_at": c.created_at.isoformat() if c.created_at else None
-            })
-        return jsonify({"comments": result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/artists/<artist_id>/comments', methods=['POST'])
-def create_artist_comment(artist_id):
-    data = request.json
-    nickname = data.get('nickname')
-    password = data.get('password')
-    content = data.get('content')
-    track_id = data.get('track_id')
-    parent_id = data.get('parent_id')
-    track_name = data.get('track_name')
-    track_artist = data.get('track_artist')
-    track_image = data.get('track_image')
-
-    if not all([nickname, password, content, track_id]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    comment = ArtistComment(
-        artist_id=artist_id,
-        parent_id=parent_id,
-        nickname=nickname,
-        password_hash=generate_password_hash(password),
-        content=content,
-        track_id=track_id,
-        track_name=track_name,
-        track_artist=track_artist,
-        track_image=track_image
-    )
-    db.session.add(comment)
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-    
-    return jsonify({"success": True, "comment_id": comment.id})
-
-@app.route('/api/artists/comments/<int:comment_id>', methods=['PUT', 'DELETE'])
-def modify_artist_comment(comment_id):
-    comment = ArtistComment.query.get(comment_id)
-    if not comment:
-        return jsonify({"error": "Comment not found"}), 404
-
-    data = request.json or {}
-    password = data.get('password')
-    if not password or not check_password_hash(comment.password_hash, password):
-        return jsonify({"error": "Incorrect password"}), 403
-
-    if request.method == 'DELETE':
-        db.session.delete(comment)
-        children = ArtistComment.query.filter_by(parent_id=comment_id).all()
-        for child in children:
-            db.session.delete(child)
-        try:
-            db.session.commit()
-            return jsonify({"success": True})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
-            
-    elif request.method == 'PUT':
-        content = data.get('content')
-        if content:
-            comment.content = content
-            try:
-                db.session.commit()
-                return jsonify({"success": True})
-            except Exception as e:
-                db.session.rollback()
-                return jsonify({"error": str(e)}), 500
-        return jsonify({"error": "Missing content"}), 400
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    finally:
+        if 'conn' in locals() and conn.open:
+            conn.close()
