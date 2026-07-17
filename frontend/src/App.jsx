@@ -548,7 +548,12 @@ function App() {
       scrollAmount = 30;
     }
     
-    container.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+    // 모바일 등에서 컨테이너 자체가 스크롤되지 않는 경우(전체 화면 스크롤)를 위한 처리
+    if (window.getComputedStyle(container).overflowY === 'visible' || container.scrollHeight <= container.clientHeight) {
+      window.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+    } else {
+      container.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+    }
   };
 
   return (
