@@ -22,7 +22,7 @@ if os.path.exists(env_path):
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'lyrics.db'))
 app.config['SQLALCHEMY_BINDS'] = {
-    'guitar_db': 'mysql+pymysql://conansjh20:P020673#1@conansjh20.mysql.pythonanywhere-services.com/conansjh20$guitar'
+    'guitar_db': os.environ.get('GUITAR_DB_URL', 'mysql+pymysql://conansjh20:P020673#1@conansjh20.mysql.pythonanywhere-services.com/conansjh20$guitar')
 }
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
