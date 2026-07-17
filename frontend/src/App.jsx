@@ -531,6 +531,25 @@ function App() {
     }
   };
 
+  const handleLyricsClick = (e) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('textarea')) return;
+    
+    const container = e.currentTarget;
+    const firstLine = container.querySelector('.lyrics-line') || container.querySelector('.lyrics-string-container');
+    
+    let scrollAmount = 80;
+    if (firstLine) {
+      if (firstLine.classList.contains('lyrics-string-container')) {
+        scrollAmount = 30; // approx 1 line of pre-wrap text
+      } else {
+        const style = window.getComputedStyle(firstLine);
+        const margin = parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0);
+        scrollAmount = firstLine.offsetHeight + margin;
+      }
+    }
+    container.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+  };
+
   return (
     <main 
       className={`main-container light-mode ${selectedTrack ? 'has-selection' : ''}`}
@@ -746,7 +765,7 @@ function App() {
             )}
             
             {lyrics && (
-              <div className="lyrics-container">
+              <div className="lyrics-container" onClick={handleLyricsClick} style={{ cursor: 'pointer' }}>
                 {typeof lyrics === 'string' ? (
                   <div className="lyrics-string-container">
                     <pre className="lyrics-text">{lyrics}</pre>
