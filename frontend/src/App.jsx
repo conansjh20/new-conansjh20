@@ -535,18 +535,19 @@ function App() {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('textarea')) return;
     
     const container = e.currentTarget;
-    const firstLine = container.querySelector('.lyrics-line') || container.querySelector('.lyrics-string-container');
+    const firstLine = container.querySelector('.lyrics-line');
     
     let scrollAmount = 80;
     if (firstLine) {
-      if (firstLine.classList.contains('lyrics-string-container')) {
-        scrollAmount = 30; // approx 1 line of pre-wrap text
-      } else {
-        const style = window.getComputedStyle(firstLine);
-        const margin = parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0);
-        scrollAmount = firstLine.offsetHeight + margin;
-      }
+      const style = window.getComputedStyle(firstLine);
+      const mt = parseFloat(style.marginTop) || 0;
+      const mb = parseFloat(style.marginBottom) || 0;
+      scrollAmount = firstLine.offsetHeight + mt + mb;
+      if (isNaN(scrollAmount) || scrollAmount <= 0) scrollAmount = 80;
+    } else if (container.querySelector('.lyrics-string-container')) {
+      scrollAmount = 30;
     }
+    
     container.scrollBy({ top: scrollAmount, behavior: 'smooth' });
   };
 
