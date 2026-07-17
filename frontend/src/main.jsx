@@ -10,6 +10,10 @@ import Stats from './Stats.jsx'
 import ArtistBoard from './ArtistBoard.jsx'
 import ArtistDetail from './ArtistDetail.jsx'
 
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  document.title = '[로컬] 코난수집함';
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
