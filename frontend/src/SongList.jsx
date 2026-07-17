@@ -287,7 +287,9 @@ export default function SongList() {
                         <div className="song-likes" style={{ fontSize: '0.85rem', color: '#ff4d4d', marginTop: '4px' }}>
                           ❤️ {song.likes || 0}
                         </div>
-                        <div className="song-id-display">ID: {song.id}</div>
+                        <div className="song-id-display">
+                          ID: <Link to={`/song/${song.id}`} onClick={e => e.stopPropagation()} style={{ color: 'var(--accent-color, #1db954)', textDecoration: 'underline' }}>{song.id}</Link>
+                        </div>
                       </>
                     )}
                   </div>
