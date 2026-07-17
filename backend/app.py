@@ -95,6 +95,8 @@ app.register_blueprint(lyrics_bp)
 app.register_blueprint(radio_bp)
 app.register_blueprint(engcross_bp)
 app.register_blueprint(guitar_bp)
+from routes.artists import artists_bp
+app.register_blueprint(artists_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)

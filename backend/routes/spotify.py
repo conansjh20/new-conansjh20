@@ -84,6 +84,25 @@ def spotify_search():
 
     return jsonify({"tracks": {"items": items}})
 
+@spotify_bp.route('/api/spotify/search/artist', methods=['GET'])
+def spotify_search_artist():
+    query = request.args.get('q')
+    if not query:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+
+    try:
+        token = get_spotify_token()
+        url = f"https://api.spotify.com/v1/search?q={query}&type=artist&limit=15&market=KR"
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        result = requests.get(url, headers=headers)
+        return jsonify(result.json())
+    except Exception as e:
+        print("Spotify artist search error:", e)
+        return jsonify({"error": str(e)}), 500
+
 @spotify_bp.route('/api/spotify/artist/<artist_id>/top-tracks', methods=['GET'])
 def spotify_artist_top_tracks(artist_id):
     token = get_spotify_token()
