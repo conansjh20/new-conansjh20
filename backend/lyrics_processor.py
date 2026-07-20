@@ -129,7 +129,10 @@ def process_lyrics_text(raw_lyrics):
     lines_to_translate = []
     
     for line in lines:
-        # Strip timestamp like [00:17.12] or [00:17.123]
+        # Extract and strip timestamp like [00:17.12] or [00:17.123]
+        timestamp_match = re.match(r'(\[\d{2}:\d{2}\.\d{2,3}\])', line)
+        timestamp = timestamp_match.group(1) if timestamp_match else ""
+        
         clean_line = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line).strip()
         if not clean_line:
             continue
@@ -184,6 +187,7 @@ def process_lyrics_text(raw_lyrics):
         
         lines_to_translate.append(clean_line)
         results.append({
+            "timestamp": timestamp,
             "original": clean_line,
             "pronunciation": pronunciation_ko,
             "translation": "",

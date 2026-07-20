@@ -226,3 +226,61 @@ def get_color():
     except Exception as e:
         print("Color extraction failed:", e)
         return jsonify({"error": str(e)}), 500
+
+@lyrics_bp.route('/api/lyrics/auto-fetch', methods=['GET'])
+def auto_fetch_lyrics():
+    """
+    LRCLIB 무료 API를 통해 가사 원문을 자동으로 가져오고, 
+    기존 로직(MeCab 독음 + DeepL 번역)을 거쳐 최종 결과를 반환합니다.
+    """
+    title = request.args.get('title')
+    artist = request.args.get('artist')
+    
+    if not title or not artist:
+        return jsonify({"error": "title and artist parameters are required"}), 400
+        
+    try:
+        # 1. LRCLIB API를 통해 가사 검색
+        # 'get' 엔드포인트 시도 (정확한 매칭)
+        url = "https://lrclib.net/api/get"
+        params = {
+            "track_name": title,
+            "artist_name": artist
+        }
+        res = requests.get(url, params=params, timeout=10)
+        
+        lrclib_data = None
+        if res.status_code == 200:
+            lrclib_data = res.json()
+        else:
+            # 'get'이 실패하면 'search' 엔드포인트로 첫 번째 결과 시도
+            search_url = "https://lrclib.net/api/search"
+            # q 파라미터로 제목+가수 검색
+            search_res = requests.get(search_url, params={"q": f"{title} {artist}"}, timeout=10)
+            if search_res.status_code == 200:
+                data = search_res.json()
+                if isinstance(data, list) and len(data) > 0:
+                    lrclib_data = data[0]
+                    
+        if not lrclib_data:
+            return jsonify({"error": "Lyrics not found on LRCLIB"}), 404
+            
+        # syncedLyrics가 있으면 우선 사용, 없으면 plainLyrics 사용
+        raw_lyrics = lrclib_data.get('syncedLyrics') or lrclib_data.get('plainLyrics')
+        
+        if not raw_lyrics:
+            return jsonify({"error": "Lyrics content is empty"}), 404
+            
+        # 2. 기존 process_lyrics_text 함수로 독음 및 번역 처리
+        processed = process_lyrics_text(raw_lyrics)
+        
+        return jsonify({
+            "title": title,
+            "artist": artist,
+            "source": "lrclib",
+            "lyrics": processed
+        })
+        
+    except Exception as e:
+        print("Auto fetch lyrics error:", e)
+        return jsonify({"error": str(e)}), 500
